@@ -45,8 +45,14 @@ function readAll(name) {
   const sh = getOrCreateSheet(name);
   const values = sh.getDataRange().getValues();
   const head = values.shift();
+  const tz = Session.getScriptTimeZone();
   return values.map(row => {
-    const o = {}; head.forEach((h, i) => o[h] = row[i]); return o;
+    const o = {};
+    head.forEach((h, i) => {
+      const v = row[i];
+      o[h] = (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : v;
+    });
+    return o;
   });
 }
 
