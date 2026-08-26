@@ -18,10 +18,12 @@ function movingAverage(series, window = 7) {
 }
 
 // 由移動平均序列的頭尾點換算 kg/週（負值=下降）；資料不足或跨距為 0 回傳 null
+// 內部先依日期升冪排序一份副本，不依賴呼叫端是否已排序
 function weeklyTrendChange(maSeries) {
   if (!maSeries || maSeries.length < 2) return null;
-  const first = maSeries[0];
-  const last = maSeries[maSeries.length - 1];
+  const sorted = [...maSeries].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
   const days = (new Date(last.date) - new Date(first.date)) / 86400000;
   if (days <= 0) return null;
   return ((last.avg - first.avg) / days) * 7;

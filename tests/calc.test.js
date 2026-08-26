@@ -44,6 +44,15 @@ test('weeklyTrendChange: 由移動平均頭尾換算 kg/週', () => {
   assert.ok(Math.abs(r - (-1)) < 1e-9); // -1 kg/週
 });
 
+test('weeklyTrendChange: 輸入反序仍能算出正確（非正負顛倒）結果', () => {
+  const ma = [
+    { date: '2026-08-08', avg: 60 },
+    { date: '2026-08-01', avg: 61 },
+  ];
+  const r = calc.weeklyTrendChange(ma);
+  assert.ok(Math.abs(r - (-1)) < 1e-9); // 內部應先排序，不可依賴呼叫端順序
+});
+
 test('dailyEnergyBalance: kg/週 → kcal/日（-0.5kg/週 ≈ -550）', () => {
   const r = calc.dailyEnergyBalance(-0.5);
   assert.ok(Math.abs(r - (-550)) < 1e-9); // -0.5*7700/7
