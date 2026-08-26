@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>照片</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, sans-serif; background: #FAF7F2; color: #3A2E24; padding-bottom: 80px; }
+    .header { background: #7A5C3E; color: #fff; padding: calc(16px + env(safe-area-inset-top)) 20px 16px; font-size: 18px; font-weight: 600; }
+    .content { padding: 16px; }
+    .compare { display: flex; gap: 10px; margin-bottom: 16px; }
+    .compare figure { flex: 1; }
+    .compare img { width: 100%; border-radius: 12px; }
+    .compare figcaption { font-size: 12px; color: #777; text-align: center; margin-top: 4px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .grid figure img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; }
+    .grid figcaption { font-size: 10px; color: #999; text-align: center; }
+    .empty { text-align: center; color: #999; padding: 40px 0; }
+    .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #eee; padding-bottom: env(safe-area-inset-bottom); }
+    .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #999; text-decoration: none; }
+    .nav a.active { color: #7A5C3E; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="header">照片牆</div>
+  <div class="content" id="content"><div class="empty">載入中…</div></div>
+  <nav class="nav">
+    <a href="index.html">儀表板</a>
+    <a href="add.html">記錄</a>
+    <a href="photos.html" class="active">照片</a>
+  </nav>
+  <script src="js/api.js"></script>
+  <script>
+    const url = (id) => `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
+    (async () => {
+      const el = document.getElementById('content');
+      let res; try { res = await API.apiGet('getAll'); } catch (e) { el.innerHTML = '<div class="empty">載入失敗</div>'; return; }
+      const photos = (res.data.body || []).filter(b => b.photo_id)
+        .map(b => ({ date: String(b.date).slice(0, 10), id: b.photo_id }))
+        .sort((a, b) => a.date < b.date ? -1 : 1);
+      if (!photos.length) { el.innerHTML = '<div class="empty">還沒有照片，去「記錄」拍第一張吧</div>'; return; }
+      const first = photos[0], last = photos[photos.length - 1];
+      let html = '';
+      if (photos.length >= 2) {
+        html += `<div class="compare">
+          <figure><img src="${url(first.id)}" loading="lazy"><figcaption>起點 ${first.date}</figcaption></figure>
+          <figure><img src="${url(last.id)}" loading="lazy"><figcaption>最新 ${last.date}</figcaption></figure>
+        </div>`;
+      }
+      html += '<div class="grid">' + photos.slice().reverse().map(p =>
+        `<figure><img src="${url(p.id)}" loading="lazy"><figcaption>${p.date}</figcaption></figure>`).join('') + '</div>';
+      el.innerHTML = html;
+    })();
+  </script>
+</body>
+</html>
