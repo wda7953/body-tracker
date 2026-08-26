@@ -4,9 +4,11 @@ var module = typeof module !== 'undefined' ? module : { exports: {} };
 const KCAL_PER_KG = 7700; // 每公斤脂肪約含 7700 kcal
 
 // 7 日移動平均。series: [{date:'YYYY-MM-DD', value:Number}]
+// null/undefined 視為空陣列；window 必須 >= 1（否則拋錯，避免靜默算出 NaN）
 // 回傳依日期升冪、每點附 avg（不足視窗天數就用截至該點的現有資料平均）
 function movingAverage(series, window = 7) {
-  const sorted = [...series].sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (window <= 0) throw new Error('window must be >= 1');
+  const sorted = [...(series || [])].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   return sorted.map((pt, i) => {
     const start = Math.max(0, i - window + 1);
     const slice = sorted.slice(start, i + 1);

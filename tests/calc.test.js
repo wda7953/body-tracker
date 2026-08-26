@@ -15,6 +15,26 @@ test('movingAverage: 視窗內取平均，不足視窗用現有點', () => {
   assert.strictEqual(r[2].avg, 61.5);          // (62+61)/2
 });
 
+test('movingAverage: null/undefined 視為空陣列，不拋錯', () => {
+  assert.deepStrictEqual(calc.movingAverage(null), []);
+  assert.deepStrictEqual(calc.movingAverage(undefined), []);
+});
+
+test('movingAverage: window <= 0 應拋出錯誤', () => {
+  assert.throws(() => calc.movingAverage([{ date: '2026-08-01', value: 60 }], 0), /window must be >= 1/);
+  assert.throws(() => calc.movingAverage([{ date: '2026-08-01', value: 60 }], -1), /window must be >= 1/);
+});
+
+test('movingAverage: 輸入未排序時，輸出仍依日期升冪排列', () => {
+  const s = [
+    { date: '2026-08-03', value: 61 },
+    { date: '2026-08-01', value: 60 },
+    { date: '2026-08-02', value: 62 },
+  ];
+  const r = calc.movingAverage(s, 2);
+  assert.deepStrictEqual(r.map(p => p.date), ['2026-08-01', '2026-08-02', '2026-08-03']);
+});
+
 test('weeklyTrendChange: 由移動平均頭尾換算 kg/週', () => {
   const ma = [
     { date: '2026-08-01', avg: 61 },
