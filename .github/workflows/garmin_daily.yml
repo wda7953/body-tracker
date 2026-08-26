@@ -1,0 +1,26 @@
+# body-tracker/.github/workflows/garmin_daily.yml
+name: garmin-daily
+on:
+  schedule:
+    - cron: '0 22 * * *'   # UTC 22:00 = 台灣隔日 06:00
+  workflow_dispatch: {}
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -r body-tracker/scripts/requirements.txt
+      - name: Fetch Garmin
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          API_URL: ${{ secrets.BODY_API_URL }}
+          API_TOKEN: ${{ secrets.BODY_API_TOKEN }}
+        run: python body-tracker/scripts/garmin_daily.py
+      - name: 失敗通知（LINE）
+        if: failure()
+        env:
+          LINE_MSG: 'Garmin 每日撈取失敗，請手動 workflow_dispatch 重跑'
+        run: echo "$LINE_MSG"  # TODO(部署後)：改接現有 send_line_reminder.py
