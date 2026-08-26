@@ -20,5 +20,6 @@ function dailyAdvice(m) {
   return '數據平穩 → 照常執行，記得補體重、偶爾量腰圍。';
 }
 
-if (typeof module !== 'undefined') { module.exports = { dailyAdvice }; }
-if (typeof window !== 'undefined') { window.Advice = { dailyAdvice }; }
+const api = { dailyAdvice };
+if (typeof module !== 'undefined') { module.exports = api; }
+if (typeof window !== 'undefined') { window.Advice = api; }

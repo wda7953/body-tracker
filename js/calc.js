@@ -1,6 +1,5 @@
 // body-tracker/js/calc.js
 // 純函式減脂計算核心。零外部相依，Node 與瀏覽器共用（結尾同時支援 module.exports 與 window.Calc）。
-var module = typeof module !== 'undefined' ? module : { exports: {} };
 const KCAL_PER_KG = 7700; // 每公斤脂肪約含 7700 kcal
 
 // 7 日移動平均。series: [{date:'YYYY-MM-DD', value:Number}]
@@ -64,10 +63,11 @@ function projectGoal(currentTrendWeight, targetWeight, kgPerWeek, fromDate = new
   return { weeksToGoal: weeks, etaDate: formatLocalDate(eta) };
 }
 
-module.exports = {
+const api = {
   KCAL_PER_KG, movingAverage,
   weeklyTrendChange, dailyEnergyBalance, estimateIntake, projectGoal,
 };
 
-// 瀏覽器環境掛到 window.Calc（Node 環境 window 不存在，略過）
-if (typeof window !== 'undefined') { window.Calc = module.exports; }
+// Node 與瀏覽器環境各自掛載，互不干擾（不使用 var module 保險寫法，避免在瀏覽器洩漏 window.module）
+if (typeof module !== 'undefined') { module.exports = api; }
+if (typeof window !== 'undefined') { window.Calc = api; }

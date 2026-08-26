@@ -24,5 +24,6 @@ function lineChartSVG(opts) {
   return `<svg viewBox="0 0 ${width} ${height}" width="100%" preserveAspectRatio="none">${target}${polylines}</svg>`;
 }
 
-if (typeof module !== 'undefined') { module.exports = { lineChartSVG }; }
-if (typeof window !== 'undefined') { window.Chart = { lineChartSVG }; }
+const api = { lineChartSVG };
+if (typeof module !== 'undefined') { module.exports = api; }
+if (typeof window !== 'undefined') { window.Chart = api; }
