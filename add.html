@@ -48,12 +48,25 @@
   </nav>
   <script src="js/api.js"></script>
   <script>
-    document.getElementById('date').value = new Date().toISOString().slice(0, 10);
+    // 台灣早上量體重常在 08:00 前，toISOString() 會轉成 UTC 而倒退一天（NEVER-#2 時區 bug），
+    // 改用本地年/月/日組字串，與 calc.js 的 formatLocalDate 邏輯一致
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const d0 = new Date();
+    document.getElementById('date').value = `${d0.getFullYear()}-${pad2(d0.getMonth() + 1)}-${pad2(d0.getDate())}`;
     let photoBase64 = null;
     document.getElementById('photo').addEventListener('change', (e) => {
       const f = e.target.files[0]; if (!f) return;
+      const msg = document.getElementById('msg');
+      const resetPhoto = () => {
+        photoBase64 = null;
+        document.getElementById('photo').value = '';
+        document.getElementById('preview').style.display = 'none';
+        msg.textContent = '圖片讀取失敗，換一張試試'; msg.style.color = '#C62828';
+      };
       // 壓縮：長邊縮到 1080，JPEG 0.7，避免 base64 過大
       const img = new Image(); const rd = new FileReader();
+      rd.onerror = resetPhoto;
+      img.onerror = resetPhoto;
       rd.onload = () => { img.onload = () => {
         const max = 1080; let { width: w, height: h } = img;
         if (Math.max(w, h) > max) { const r = max / Math.max(w, h); w = Math.round(w*r); h = Math.round(h*r); }
