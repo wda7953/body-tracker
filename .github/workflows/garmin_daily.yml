@@ -19,8 +19,14 @@ jobs:
           API_URL: ${{ secrets.BODY_API_URL }}
           API_TOKEN: ${{ secrets.BODY_API_TOKEN }}
         run: python scripts/garmin_daily.py
-      - name: 失敗通知（LINE）
+      - name: 失敗通知（LINE push）
         if: failure()
-        env:
-          LINE_MSG: 'Garmin 每日撈取失敗，請手動 workflow_dispatch 重跑'
-        run: echo "$LINE_MSG"  # TODO(部署後)：改接現有 send_line_reminder.py
+        # 雲端沒有 macOS Keychain，改用 GitHub Secrets + LINE Messaging API push（同 email-summary repo 慣例）
+        run: |
+          curl -s -X POST https://api.line.me/v2/bot/message/push \
+            -H "Authorization: Bearer ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "to": "${{ secrets.LINE_USER_ID }}",
+              "messages": [{"type":"text","text":"⚠️ Body tracker：Garmin 每日撈取失敗，請到 GitHub → Actions → garmin-daily → Run workflow 手動補跑。"}]
+            }'

@@ -56,6 +56,8 @@ GitHub repo 頁 → **Settings → Secrets and variables → Actions → New rep
 | `GARMIN_PASSWORD` | 你的 Garmin Connect 密碼 |
 | `BODY_API_URL` | 步驟 1-7 的網頁應用程式 URL |
 | `BODY_API_TOKEN` | 你的密鑰（同後端） |
+| `LINE_CHANNEL_ACCESS_TOKEN` | 你的 LINE Bot channel token（撈取失敗時通知你；值跟 email-summary repo 那個一樣） |
+| `LINE_USER_ID` | 你的 LINE user id（同上，跟 email-summary repo 一樣） |
 
 ### 步驟 5：設定小目標體重
 
@@ -115,6 +117,9 @@ python3 garmin_daily.py
 
 ---
 
-## 待接（部署後的後續，非上線必需）
-- **失敗通知接 LINE**：workflow 目前失敗只 echo，之後改呼叫你現有的 `send_line_reminder.py`（憑證走 macOS Keychain / GitHub Secret）。
-- **同步排程總覽**：在 `weekly-schedule-summary.yml` 固定文字加「每天 06:00 Garmin 身體追蹤撈取」，並更新 auto-memory `project-github-actions`。
+## 待接（部署時處理）
+- **同步排程總覽**：部署上線後，在 email-summary repo 的 `weekly-schedule-summary.yml` 固定文字加一行「每天 06:00 Garmin 身體追蹤撈取」，並更新 auto-memory `project-github-actions`。（現在先不加，避免總覽列出還沒上線的排程。）
+- **⚠️ GitHub 內建排程可靠度**：email-summary repo 因 GitHub 內建 cron 不穩，改用 cron-job.org 外部觸發。本 repo 的 `garmin_daily.yml` 目前用內建 `schedule` cron，若發現常漏跑，改成 `workflow_dispatch` + cron-job.org 外部觸發同一套。
+
+## 已接
+- **失敗通知走 LINE push**：workflow 撈取失敗時用 `LINE_CHANNEL_ACCESS_TOKEN` + `LINE_USER_ID`（GitHub Secrets）直接 push LINE（雲端沒有 macOS Keychain，故不用本機的 `send_line_reminder.py`）。
