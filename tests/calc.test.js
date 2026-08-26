@@ -33,3 +33,17 @@ test('estimateIntake: 平均TDEE + 每日能量平衡', () => {
   const r = calc.estimateIntake(2000, -0.5); // 2000 + (-550)
   assert.ok(Math.abs(r - 1450) < 1e-9);
 });
+
+test('projectGoal: 減脂中 → 回傳週數與 ETA', () => {
+  const r = calc.projectGoal(60, 57, -0.5, new Date('2026-08-27'));
+  assert.ok(Math.abs(r.weeksToGoal - 6) < 1e-9); // (57-60)/-0.5 = 6 週
+  assert.strictEqual(r.etaDate, '2026-10-08');    // +42 天
+});
+
+test('projectGoal: 趨勢方向相反（在變胖但目標更輕）→ null', () => {
+  assert.strictEqual(calc.projectGoal(60, 57, +0.3), null);
+});
+
+test('projectGoal: 無趨勢（0）→ null', () => {
+  assert.strictEqual(calc.projectGoal(60, 57, 0), null);
+});

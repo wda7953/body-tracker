@@ -1,5 +1,6 @@
 // body-tracker/js/calc.js
 // 純函式減脂計算核心。零外部相依，Node 與瀏覽器共用（結尾同時支援 module.exports 與 window.Calc）。
+var module = typeof module !== 'undefined' ? module : { exports: {} };
 const KCAL_PER_KG = 7700; // 每公斤脂肪約含 7700 kcal
 
 // 7 日移動平均。series: [{date:'YYYY-MM-DD', value:Number}]
@@ -34,7 +35,22 @@ function estimateIntake(avgTDEE, kgPerWeek) {
   return avgTDEE + dailyEnergyBalance(kgPerWeek);
 }
 
+// 預估達標。currentTrendWeight=目前趨勢體重, targetWeight=目標, kgPerWeek=週趨勢
+// 方向不一致或無趨勢回傳 null；否則回 {weeksToGoal, etaDate:'YYYY-MM-DD'}
+function projectGoal(currentTrendWeight, targetWeight, kgPerWeek, fromDate = new Date()) {
+  if (!kgPerWeek) return null;
+  const remaining = targetWeight - currentTrendWeight;
+  if (remaining === 0) return { weeksToGoal: 0, etaDate: new Date(fromDate).toISOString().slice(0, 10) };
+  if (Math.sign(remaining) !== Math.sign(kgPerWeek)) return null;
+  const weeks = remaining / kgPerWeek;
+  const eta = new Date(new Date(fromDate).getTime() + weeks * 7 * 86400000);
+  return { weeksToGoal: weeks, etaDate: eta.toISOString().slice(0, 10) };
+}
+
 module.exports = {
   KCAL_PER_KG, movingAverage,
-  weeklyTrendChange, dailyEnergyBalance, estimateIntake,
+  weeklyTrendChange, dailyEnergyBalance, estimateIntake, projectGoal,
 };
+
+// 瀏覽器環境掛到 window.Calc（Node 環境 window 不存在，略過）
+if (typeof window !== 'undefined') { window.Calc = module.exports; }
