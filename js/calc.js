@@ -63,11 +63,12 @@ function projectGoal(currentTrendWeight, targetWeight, kgPerWeek, fromDate = new
   return { weeksToGoal: weeks, etaDate: formatLocalDate(eta) };
 }
 
-const api = {
+// 變數名加前綴避免瀏覽器多個 <script> 共用全域作用域時撞名（各檔都叫 api 會 "already declared"）
+const calcApi = {
   KCAL_PER_KG, movingAverage,
   weeklyTrendChange, dailyEnergyBalance, estimateIntake, projectGoal,
 };
 
 // Node 與瀏覽器環境各自掛載，互不干擾（不使用 var module 保險寫法，避免在瀏覽器洩漏 window.module）
-if (typeof module !== 'undefined') { module.exports = api; }
-if (typeof window !== 'undefined') { window.Calc = api; }
+if (typeof module !== 'undefined') { module.exports = calcApi; }
+if (typeof window !== 'undefined') { window.Calc = calcApi; }

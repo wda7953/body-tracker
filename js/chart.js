@@ -25,6 +25,7 @@ function lineChartSVG(opts) {
   return `<svg viewBox="0 0 ${width} ${height}" width="100%" preserveAspectRatio="none">${target}${polylines}</svg>`;
 }
 
-const api = { lineChartSVG };
-if (typeof module !== 'undefined') { module.exports = api; }
-if (typeof window !== 'undefined') { window.Chart = api; }
+// 變數名加前綴避免瀏覽器多個 <script> 共用全域作用域時撞名
+const chartApi = { lineChartSVG };
+if (typeof module !== 'undefined') { module.exports = chartApi; }
+if (typeof window !== 'undefined') { window.Chart = chartApi; }

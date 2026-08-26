@@ -22,6 +22,7 @@ function dailyAdvice(m) {
   return '數據平穩 → 照常執行，記得補體重、偶爾量腰圍。';
 }
 
-const api = { dailyAdvice };
-if (typeof module !== 'undefined') { module.exports = api; }
-if (typeof window !== 'undefined') { window.Advice = api; }
+// 變數名加前綴避免瀏覽器多個 <script> 共用全域作用域時撞名
+const adviceApi = { dailyAdvice };
+if (typeof module !== 'undefined') { module.exports = adviceApi; }
+if (typeof window !== 'undefined') { window.Advice = adviceApi; }
