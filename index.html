@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>身體追蹤</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, sans-serif; background: #FAF7F2; color: #3A2E24; padding-bottom: 80px; }
+    .header { background: #7A5C3E; color: #fff; padding: calc(16px + env(safe-area-inset-top)) 20px 16px; font-size: 18px; font-weight: 600; }
+    .content { padding: 16px; }
+    .card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+    .advice { background: #EEF3EC; border-left: 4px solid #2E7D32; font-size: 14px; line-height: 1.5; }
+    .row { display: flex; gap: 12px; }
+    .row .card { flex: 1; text-align: center; }
+    .stat .label { font-size: 12px; color: #999; margin-bottom: 6px; }
+    .stat .val { font-size: 22px; font-weight: 700; }
+    .stat .sub { font-size: 11px; color: #999; margin-top: 4px; }
+    h2 { font-size: 13px; color: #777; margin: 4px 0 8px; }
+    .legend { font-size: 11px; color: #999; margin-top: 6px; }
+    .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #eee; padding-bottom: env(safe-area-inset-bottom); }
+    .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #999; text-decoration: none; }
+    .nav a.active { color: #7A5C3E; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="header">身體追蹤</div>
+  <div class="content" id="content"><div class="card">載入中…</div></div>
+  <nav class="nav">
+    <a href="index.html" class="active">儀表板</a>
+    <a href="add.html">記錄</a>
+    <a href="photos.html">照片</a>
+  </nav>
+  <script src="js/calc.js"></script>
+  <script src="js/advice.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+    (async () => {
+      const el = document.getElementById('content');
+      let res;
+      try { res = await API.apiGet('getAll'); } catch (e) { el.innerHTML = '<div class="card">載入失敗：' + e.message + '</div>'; return; }
+      if (!res.ok) { el.innerHTML = '<div class="card">錯誤：' + res.error + '</div>'; return; }
+      const { daily, body, settings } = res.data;
+      const setMap = {}; (settings || []).forEach(s => setMap[s.key] = s.value);
+      const targetWeight = setMap.target_weight ? parseFloat(setMap.target_weight) : null;
+
+      // 體重序列 → 7 日均線
+      const weights = body.filter(b => b.weight_kg !== '' && b.weight_kg != null)
+        .map(b => ({ date: String(b.date).slice(0, 10), value: parseFloat(b.weight_kg) }));
+      const ma = Calc.movingAverage(weights, 7);
+
+      // 近 14 天窗口算趨勢，避免整段歷史稀釋
+      const recentMa = ma.slice(-14);
+      const kgPerWeek = Calc.weeklyTrendChange(recentMa);
+      const dailyBal = kgPerWeek != null ? Calc.dailyEnergyBalance(kgPerWeek) : null;
+
+      // 近 7 天平均 TDEE
+      const recentDaily = daily.filter(d => d.tdee_total !== '' && d.tdee_total != null).slice(-7);
+      const avgTDEE = recentDaily.length ? recentDaily.reduce((s, d) => s + parseFloat(d.tdee_total), 0) / recentDaily.length : null;
+      const estIntake = (avgTDEE != null && kgPerWeek != null) ? Calc.estimateIntake(avgTDEE, kgPerWeek) : null;
+
+      const curTrend = ma.length ? ma[ma.length - 1].avg : null;
+      const proj = (curTrend != null && targetWeight != null && kgPerWeek != null)
+        ? Calc.projectGoal(curTrend, targetWeight, kgPerWeek) : null;
+
+      // 恢復指標（近 3 天平均）
+      const recent3 = daily.slice(-3);
+      const avg = (arr, k) => { const v = arr.map(x => parseFloat(x[k])).filter(n => !isNaN(n)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+      const sleepScore = avg(recent3, 'sleep_score'), avgStress = avg(recent3, 'avg_stress'), bodyBattery = avg(recent3, 'body_battery');
+      const weightStalled = kgPerWeek != null && Math.abs(kgPerWeek) < 0.1;
+      const advice = Advice.dailyAdvice({ sleepScore, avgStress, bodyBattery, weightKgPerWeek: kgPerWeek, weightStalled });
+
+      // 體重圖：原始點 + 均線 + 目標線
+      const chartSvg = Chart.lineChartSVG({
+        width: 320, height: 150,
+        series: [
+          { name: 'raw', color: '#D9C9B6', points: weights.map(w => ({ x: 0, y: w.value })) },
+          { name: 'ma', color: '#7A5C3E', points: ma.map(m => ({ x: 0, y: m.avg })) },
+        ],
+        targetY: targetWeight,
+      });
+
+      const f = (n, d = 1) => n == null ? '—' : Number(n).toFixed(d);
+      el.innerHTML = `
+        <div class="card advice">💡 ${advice}</div>
+        <div class="card">
+          <h2>體重趨勢（原始・7日均線・目標）</h2>
+          ${chartSvg}
+          <div class="legend">趨勢 ${kgPerWeek == null ? '—' : (kgPerWeek >= 0 ? '+' : '') + f(kgPerWeek, 2) + ' kg/週'}　目前均線 ${f(curTrend)} kg</div>
+        </div>
+        <div class="row">
+          <div class="card stat"><div class="label">本週實際缺口</div><div class="val">${dailyBal == null ? '—' : Math.round(dailyBal)}</div><div class="sub">kcal/日（負=缺口）</div></div>
+          <div class="card stat"><div class="label">近7日 TDEE</div><div class="val">${avgTDEE == null ? '—' : Math.round(avgTDEE)}</div><div class="sub">kcal/日</div></div>
+        </div>
+        <div class="row">
+          <div class="card stat"><div class="label">推估攝食</div><div class="val">${estIntake == null ? '—' : Math.round(estIntake)}</div><div class="sub">kcal/日</div></div>
+          <div class="card stat"><div class="label">距目標</div><div class="val">${(curTrend != null && targetWeight != null) ? f(curTrend - targetWeight) : '—'}</div><div class="sub">${proj ? '約 ' + Math.ceil(proj.weeksToGoal) + ' 週・' + proj.etaDate : 'kg'}</div></div>
+        </div>
+        <div class="card">
+          <h2>恢復狀態（近3日均）</h2>
+          <div class="row" style="gap:8px">
+            <div class="stat" style="flex:1"><div class="label">睡眠分</div><div class="val" style="font-size:18px">${f(sleepScore, 0)}</div></div>
+            <div class="stat" style="flex:1"><div class="label">壓力</div><div class="val" style="font-size:18px">${f(avgStress, 0)}</div></div>
+            <div class="stat" style="flex:1"><div class="label">身體電量</div><div class="val" style="font-size:18px">${f(bodyBattery, 0)}</div></div>
+          </div>
+        </div>`;
+    })();
+  </script>
+</body>
+</html>
