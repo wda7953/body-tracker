@@ -47,3 +47,20 @@ test('projectGoal: 趨勢方向相反（在變胖但目標更輕）→ null', ()
 test('projectGoal: 無趨勢（0）→ null', () => {
   assert.strictEqual(calc.projectGoal(60, 57, 0), null);
 });
+
+test('projectGoal: 已達目標（remaining=0）→ weeksToGoal 0，ETA=基準日', () => {
+  const r = calc.projectGoal(57, 57, -0.5, new Date(2026, 7, 27)); // 本地建構日期，避開時區疑慮
+  assert.strictEqual(r.weeksToGoal, 0);
+  assert.strictEqual(r.etaDate, '2026-08-27');
+});
+
+test('projectGoal: 未帶 fromDate 時用本地今天日期，不受時區/時刻影響（NEVER-#2 時區規則）', () => {
+  const now = new Date();
+  const r = calc.projectGoal(60, 57, -0.5); // 6 週
+  assert.match(r.etaDate, /^\d{4}-\d{2}-\d{2}$/);
+  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  base.setDate(base.getDate() + Math.round(6 * 7));
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const expected = `${base.getFullYear()}-${pad2(base.getMonth() + 1)}-${pad2(base.getDate())}`;
+  assert.strictEqual(r.etaDate, expected);
+});

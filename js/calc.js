@@ -35,16 +35,29 @@ function estimateIntake(avgTDEE, kgPerWeek) {
   return avgTDEE + dailyEnergyBalance(kgPerWeek);
 }
 
+// 補零到兩位數（月/日格式化用）
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+// 把 Date 格式化成本地 Y/M/D 的 'YYYY-MM-DD'（NOT toISOString，避免 UTC 轉換位移日期）
+function formatLocalDate(dt) {
+  return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
+}
+
 // 預估達標。currentTrendWeight=目前趨勢體重, targetWeight=目標, kgPerWeek=週趨勢
 // 方向不一致或無趨勢回傳 null；否則回 {weeksToGoal, etaDate:'YYYY-MM-DD'}
+// ETA 一律用 fromDate 的「本地」年/月/日推算日曆天數，不用 toISOString（那是 UTC 日曆天，
+// 會因時區與時刻不同而位移一天，是 NEVER-#2 那類時區 bug）
 function projectGoal(currentTrendWeight, targetWeight, kgPerWeek, fromDate = new Date()) {
   if (!kgPerWeek) return null;
   const remaining = targetWeight - currentTrendWeight;
-  if (remaining === 0) return { weeksToGoal: 0, etaDate: new Date(fromDate).toISOString().slice(0, 10) };
+  const base = new Date(fromDate);
+  const dateOnly = new Date(base.getFullYear(), base.getMonth(), base.getDate()); // 去掉時分秒
+  if (remaining === 0) return { weeksToGoal: 0, etaDate: formatLocalDate(dateOnly) };
   if (Math.sign(remaining) !== Math.sign(kgPerWeek)) return null;
   const weeks = remaining / kgPerWeek;
-  const eta = new Date(new Date(fromDate).getTime() + weeks * 7 * 86400000);
-  return { weeksToGoal: weeks, etaDate: eta.toISOString().slice(0, 10) };
+  const eta = new Date(dateOnly);
+  eta.setDate(eta.getDate() + Math.round(weeks * 7));
+  return { weeksToGoal: weeks, etaDate: formatLocalDate(eta) };
 }
 
 module.exports = {
