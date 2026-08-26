@@ -45,11 +45,16 @@
       if (!res.ok) { el.innerHTML = '<div class="card">錯誤：' + res.error + '</div>'; return; }
       const { daily, body, settings } = res.data;
       const setMap = {}; (settings || []).forEach(s => setMap[s.key] = s.value);
-      const targetWeight = setMap.target_weight ? parseFloat(setMap.target_weight) : null;
+      const targetWeightRaw = setMap.target_weight ? parseFloat(setMap.target_weight) : null;
+      const targetWeight = Number.isNaN(targetWeightRaw) ? null : targetWeightRaw;
 
-      // 體重序列 → 7 日均線
+      // daily 理論上是機器依序寫入，但仍做防禦性排序（比照 calc.js 內部自保的做法）
+      const dailyAsc = [...daily].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+      // 體重序列 → 7 日均線；手動編輯表格可能留下非數字，過濾掉避免污染整段均線
       const weights = body.filter(b => b.weight_kg !== '' && b.weight_kg != null)
-        .map(b => ({ date: String(b.date).slice(0, 10), value: parseFloat(b.weight_kg) }));
+        .map(b => ({ date: String(b.date).slice(0, 10), value: parseFloat(b.weight_kg) }))
+        .filter(w => Number.isFinite(w.value));
       const ma = Calc.movingAverage(weights, 7);
 
       // 近 14 天窗口算趨勢，避免整段歷史稀釋
@@ -57,9 +62,12 @@
       const kgPerWeek = Calc.weeklyTrendChange(recentMa);
       const dailyBal = kgPerWeek != null ? Calc.dailyEnergyBalance(kgPerWeek) : null;
 
-      // 近 7 天平均 TDEE
-      const recentDaily = daily.filter(d => d.tdee_total !== '' && d.tdee_total != null).slice(-7);
-      const avgTDEE = recentDaily.length ? recentDaily.reduce((s, d) => s + parseFloat(d.tdee_total), 0) / recentDaily.length : null;
+      // 近 7 天平均 TDEE（先過濾非數字，全部無效則回 null）
+      const recentDaily = dailyAsc.filter(d => d.tdee_total !== '' && d.tdee_total != null)
+        .map(d => parseFloat(d.tdee_total))
+        .filter(Number.isFinite)
+        .slice(-7);
+      const avgTDEE = recentDaily.length ? recentDaily.reduce((s, v) => s + v, 0) / recentDaily.length : null;
       const estIntake = (avgTDEE != null && kgPerWeek != null) ? Calc.estimateIntake(avgTDEE, kgPerWeek) : null;
 
       const curTrend = ma.length ? ma[ma.length - 1].avg : null;
@@ -67,23 +75,25 @@
         ? Calc.projectGoal(curTrend, targetWeight, kgPerWeek) : null;
 
       // 恢復指標（近 3 天平均）
-      const recent3 = daily.slice(-3);
+      const recent3 = dailyAsc.slice(-3);
       const avg = (arr, k) => { const v = arr.map(x => parseFloat(x[k])).filter(n => !isNaN(n)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
       const sleepScore = avg(recent3, 'sleep_score'), avgStress = avg(recent3, 'avg_stress'), bodyBattery = avg(recent3, 'body_battery');
       const weightStalled = kgPerWeek != null && Math.abs(kgPerWeek) < 0.1;
       const advice = Advice.dailyAdvice({ sleepScore, avgStress, bodyBattery, weightKgPerWeek: kgPerWeek, weightStalled });
 
       // 體重圖：原始點 + 均線 + 目標線
+      // 兩條線都從已依日期排序的 ma 陣列取值（body 分頁可能有補登的舊資料造成順序錯亂，
+      // chart.js 是用陣列索引當 x 軸，若原始點不跟均線同一份排序來源會對不齊）
       const chartSvg = Chart.lineChartSVG({
         width: 320, height: 150,
         series: [
-          { name: 'raw', color: '#D9C9B6', points: weights.map(w => ({ x: 0, y: w.value })) },
+          { name: 'raw', color: '#D9C9B6', points: ma.map(m => ({ x: 0, y: m.value })) },
           { name: 'ma', color: '#7A5C3E', points: ma.map(m => ({ x: 0, y: m.avg })) },
         ],
         targetY: targetWeight,
       });
 
-      const f = (n, d = 1) => n == null ? '—' : Number(n).toFixed(d);
+      const f = (n, d = 1) => (n == null || Number.isNaN(n)) ? '—' : Number(n).toFixed(d);
       el.innerHTML = `
         <div class="card advice">💡 ${advice}</div>
         <div class="card">
@@ -92,11 +102,11 @@
           <div class="legend">趨勢 ${kgPerWeek == null ? '—' : (kgPerWeek >= 0 ? '+' : '') + f(kgPerWeek, 2) + ' kg/週'}　目前均線 ${f(curTrend)} kg</div>
         </div>
         <div class="row">
-          <div class="card stat"><div class="label">本週實際缺口</div><div class="val">${dailyBal == null ? '—' : Math.round(dailyBal)}</div><div class="sub">kcal/日（負=缺口）</div></div>
-          <div class="card stat"><div class="label">近7日 TDEE</div><div class="val">${avgTDEE == null ? '—' : Math.round(avgTDEE)}</div><div class="sub">kcal/日</div></div>
+          <div class="card stat"><div class="label">本週實際缺口</div><div class="val">${(dailyBal == null || Number.isNaN(dailyBal)) ? '—' : Math.round(dailyBal)}</div><div class="sub">kcal/日（負=缺口）</div></div>
+          <div class="card stat"><div class="label">近7日 TDEE</div><div class="val">${(avgTDEE == null || Number.isNaN(avgTDEE)) ? '—' : Math.round(avgTDEE)}</div><div class="sub">kcal/日</div></div>
         </div>
         <div class="row">
-          <div class="card stat"><div class="label">推估攝食</div><div class="val">${estIntake == null ? '—' : Math.round(estIntake)}</div><div class="sub">kcal/日</div></div>
+          <div class="card stat"><div class="label">推估攝食</div><div class="val">${(estIntake == null || Number.isNaN(estIntake)) ? '—' : Math.round(estIntake)}</div><div class="sub">kcal/日</div></div>
           <div class="card stat"><div class="label">距目標</div><div class="val">${(curTrend != null && targetWeight != null) ? f(curTrend - targetWeight) : '—'}</div><div class="sub">${proj ? '約 ' + Math.ceil(proj.weeksToGoal) + ' 週・' + proj.etaDate : 'kg'}</div></div>
         </div>
         <div class="card">
