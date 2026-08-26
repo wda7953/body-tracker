@@ -14,4 +14,27 @@ function movingAverage(series, window = 7) {
   });
 }
 
-module.exports = { KCAL_PER_KG, movingAverage };
+// 由移動平均序列的頭尾點換算 kg/週（負值=下降）；資料不足或跨距為 0 回傳 null
+function weeklyTrendChange(maSeries) {
+  if (!maSeries || maSeries.length < 2) return null;
+  const first = maSeries[0];
+  const last = maSeries[maSeries.length - 1];
+  const days = (new Date(last.date) - new Date(first.date)) / 86400000;
+  if (days <= 0) return null;
+  return ((last.avg - first.avg) / days) * 7;
+}
+
+// kg/週 → 每日熱量平衡（kcal/日，負值=缺口）
+function dailyEnergyBalance(kgPerWeek) {
+  return (kgPerWeek * KCAL_PER_KG) / 7;
+}
+
+// 推估每日攝食 = 平均 TDEE + 每日能量平衡（平衡為負代表吃得比 TDEE 少）
+function estimateIntake(avgTDEE, kgPerWeek) {
+  return avgTDEE + dailyEnergyBalance(kgPerWeek);
+}
+
+module.exports = {
+  KCAL_PER_KG, movingAverage,
+  weeklyTrendChange, dailyEnergyBalance, estimateIntake,
+};
