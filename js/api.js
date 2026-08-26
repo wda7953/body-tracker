@@ -1,6 +1,6 @@
 // body-tracker/js/api.js
-const API_URL = 'PASTE_APPS_SCRIPT_EXEC_URL';  // 部署後填入
-const API_TOKEN = 'CHANGE_ME_body_token';       // 與後端 apps-script.gs 一致
+const API_URL = 'https://script.google.com/macros/s/AKfycbw2xAshmV1x9tzj2dgR2XKPyX2dHgH1TU6NnLLmYfuP6ffVQwr77MQ77s7LjTHr9WytQA/exec';
+const API_TOKEN = 'body_1rx9a29p2h4z';       // 與後端 apps-script.gs 一致
 
 async function apiGet(action, params = {}) {
   const url = new URL(API_URL);

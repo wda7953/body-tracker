@@ -3,7 +3,7 @@
 // 安全靠共享密鑰 token：前端與 Garmin 腳本每次呼叫都要帶 ?token=，不對就擋。
 // ⚠️ 個人低風險資料用，token 在前端原始碼看得到，勿放敏感個資。
 
-const API_TOKEN = 'CHANGE_ME_body_token';  // 部署前改成你的密鑰，前端 js/api.js 與 GitHub Secret 要一致
+const API_TOKEN = 'body_1rx9a29p2h4z';  // 密鑰，前端 js/api.js 與 GitHub Secret 要一致
 
 const SS_ID = '';  // 留空＝用容器綁定的試算表；若獨立部署填入「身體追蹤」試算表 ID
 function ss() { return SS_ID ? SpreadsheetApp.openById(SS_ID) : SpreadsheetApp.getActiveSpreadsheet(); }
