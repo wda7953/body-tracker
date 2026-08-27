@@ -78,15 +78,24 @@ def main():
         'hrv_status': hrv_status,
     }
 
-    url = f'{api_url}?action=addDaily&token={token}'
-    req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'),
-                                 headers={'Content-Type': 'application/json'}, method='POST')
-    with urllib.request.urlopen(req, timeout=30) as r:
-        resp = json.loads(r.read().decode('utf-8'))
+    # 用 requests（帶 certifi 憑證）避免 macOS 上 urllib 的 SSL 憑證錯誤
+    import requests
     print('payload:', json.dumps(payload, ensure_ascii=False))
-    print('response:', resp)
-    if not resp.get('ok'):
-        print('backend rejected', file=sys.stderr); sys.exit(1)
+    ok = False
+    try:
+        r = requests.post(f'{api_url}?action=addDaily&token={token}', json=payload, timeout=30)
+        resp = r.json()
+        ok = bool(resp.get('ok'))
+        print('response:', resp)
+    except Exception as e:
+        # Apps Script POST 有時因轉址讀不到乾淨回應；改用 GET 直接驗證今天有沒有寫進去
+        print('post 回應無法解析，改查後端驗證：', e)
+    if not ok:
+        chk = requests.get(f'{api_url}?action=getAll&token={token}', timeout=30).json()
+        ok = any(str(row.get('date')).startswith(date) for row in chk.get('data', {}).get('daily', []))
+    print('verified:', ok)
+    if not ok:
+        print('backend 未確認寫入', file=sys.stderr); sys.exit(1)
 
 if __name__ == '__main__':
     main()
