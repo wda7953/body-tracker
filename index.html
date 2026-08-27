@@ -93,6 +93,25 @@
         : s >= 40 ? '🟡 可訓練，強度收斂'
         : '🔴 建議休息／輕鬆活動';
 
+      // 沒有 Garmin 原生準備度分數時，用當天 HRV狀態/睡眠/壓力/身體電量 自估「今天適合訓練還是休息」
+      const ldSleep = numOrNull(latestDaily.sleep_score);
+      const ldStress = numOrNull(latestDaily.avg_stress);
+      const ldBattery = numOrNull(latestDaily.body_battery);
+      function computedReadiness() {
+        let good = 0, bad = 0, n = 0;
+        if (hrvStatus) { n++; if (hrvStatus === 'BALANCED' || hrvStatus === 'GOOD') good++; else bad++; }
+        if (ldSleep != null) { n++; if (ldSleep >= 80) good++; else if (ldSleep < 60) bad++; }
+        if (ldStress != null) { n++; if (ldStress <= 30) good++; else if (ldStress > 50) bad++; }
+        if (ldBattery != null) { n++; if (ldBattery >= 70) good++; else if (ldBattery < 40) bad++; }
+        if (n === 0) return '—';
+        if (bad >= 2) return '🔴 建議休息／輕鬆活動';
+        if (good >= 2 && bad === 0) return '✅ 適合訓練';
+        return '🟡 可訓練，強度收斂';
+      }
+      const readyText = (trReady != null) ? readyLabel(trReady) : computedReadiness();
+      const readyScore = (trReady != null) ? f(trReady, 0) : '—';
+      const readyNote = (trReady != null) ? '' : '（依 HRV／睡眠／壓力／身體電量估）';
+
       // 體重圖：原始點 + 均線 + 目標線
       // 兩條線都從已依日期排序的 ma 陣列取值（body 分頁可能有補登的舊資料造成順序錯亂，
       // chart.js 是用陣列索引當 x 軸，若原始點不跟均線同一份排序來源會對不齊）
@@ -124,8 +143,8 @@
         <div class="card">
           <h2>今日訓練準備</h2>
           <div style="text-align:center; margin:6px 0">
-            <div class="val" style="font-size:30px">${f(trReady, 0)}</div>
-            <div class="sub" style="font-size:13px; margin-top:4px">${readyLabel(trReady)}</div>
+            <div class="val" style="font-size:20px">${readyText}</div>
+            ${trReady != null ? `<div class="sub" style="font-size:13px; margin-top:4px">分數 ${readyScore}</div>` : `<div class="sub" style="font-size:11px; margin-top:4px">${readyNote}</div>`}
           </div>
           <div class="row" style="gap:8px; margin-top:8px">
             <div class="stat" style="flex:1"><div class="label">昨晚 HRV</div><div class="val" style="font-size:18px">${hrvNight == null ? '—' : Math.round(hrvNight) + ' ms'}</div></div>
