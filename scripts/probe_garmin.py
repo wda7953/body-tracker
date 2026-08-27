@@ -1,13 +1,22 @@
 # body-tracker/scripts/probe_garmin.py
 # 一次性：印出 Garmin 昨日原始回傳，確認欄位名（不同版本/帳號可能不同）
-import os, json, datetime
+import os, sys, json, datetime, getpass
 from garminconnect import Garmin
 
 def yday():
     tw = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
     return (tw.date() - datetime.timedelta(days=1)).isoformat()
 
-g = Garmin(os.environ['GARMIN_EMAIL'], os.environ['GARMIN_PASSWORD'])
+# 有環境變數就用（CI 用）；沒有就在終端機互動輸入（本機用，密碼隱藏）
+def cred(name, prompt, secret=False):
+    v = os.environ.get(name)
+    if v: return v
+    if not sys.stdin.isatty(): raise SystemExit('缺少環境變數 ' + name)
+    return getpass.getpass(prompt) if secret else input(prompt)
+
+email = cred('GARMIN_EMAIL', 'Garmin 信箱: ')
+pw = cred('GARMIN_PASSWORD', 'Garmin 密碼（輸入時不顯示）: ', secret=True)
+g = Garmin(email, pw)
 g.login()
 d = os.environ.get('FETCH_DATE') or yday()
 def show(name, fn):
