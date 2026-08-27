@@ -6,20 +6,27 @@
   <title>記錄</title>
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0b0e12">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
   <style>
+    /* 深色運動風：黑底 + 螢光綠 + Manrope */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, sans-serif; background: #FAF7F2; color: #3A2E24; padding-bottom: 80px; }
-    .header { background: #7A5C3E; color: #fff; padding: calc(16px + env(safe-area-inset-top)) 20px 16px; font-size: 18px; font-weight: 600; }
+    body { font-family: "Manrope","Noto Sans TC",system-ui,sans-serif; background: #0e1116; color: #e6edf3; padding-bottom: 80px; -webkit-font-smoothing: antialiased; }
+    .header { background: #0b0e12; color: #fff; border-bottom: 1px solid #1c2430; padding: calc(16px + env(safe-area-inset-top)) 20px 16px; font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
     .content { padding: 16px; }
-    .card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-    label { display: block; font-size: 13px; color: #777; margin: 12px 0 6px; }
-    input[type=number], input[type=date], input[type=text] { width: 100%; padding: 12px; border: 1px solid #E5DED5; border-radius: 10px; font-size: 16px; font-family: inherit; }
-    button.save { width: 100%; padding: 14px; background: #7A5C3E; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; margin-top: 20px; }
+    .card { background: #161b22; border: 1px solid #232c38; border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; font-size: 13px; color: #7d8896; margin: 12px 0 6px; }
+    input[type=number], input[type=date], input[type=text] { width: 100%; padding: 12px; background: #0e1116; color: #e6edf3; border: 1px solid #2b333d; border-radius: 10px; font-size: 16px; font-family: inherit; }
+    input[type=number]:focus, input[type=date]:focus, input[type=text]:focus { outline: none; border-color: #00e676; }
+    input[type=file] { color: #9aa4b2; font-size: 13px; }
+    button.save { width: 100%; padding: 14px; background: #00e676; color: #06210f; border: none; border-radius: 12px; font-size: 16px; font-weight: 800; margin-top: 20px; letter-spacing: .01em; }
     .msg { text-align: center; margin-top: 12px; font-size: 14px; min-height: 20px; }
     img.preview { max-width: 100%; border-radius: 10px; margin-top: 8px; }
-    .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #eee; padding-bottom: env(safe-area-inset-bottom); }
-    .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #999; text-decoration: none; }
-    .nav a.active { color: #7A5C3E; font-weight: 600; }
+    .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #0b0e12; border-top: 1px solid #1c2430; padding-bottom: env(safe-area-inset-bottom); }
+    .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #7d8896; text-decoration: none; }
+    .nav a.active { color: #00e676; font-weight: 700; }
   </style>
 </head>
 <body>

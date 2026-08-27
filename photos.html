@@ -5,25 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>照片</title>
   <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b0e12">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
   <style>
+    /* 深色運動風：黑底 + 螢光綠 + Manrope */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, sans-serif; background: #FAF7F2; color: #3A2E24; padding-bottom: 80px; }
-    .header { background: #7A5C3E; color: #fff; padding: calc(16px + env(safe-area-inset-top)) 20px 16px; font-size: 18px; font-weight: 600; }
+    body { font-family: "Manrope","Noto Sans TC",system-ui,sans-serif; background: #0e1116; color: #e6edf3; padding-bottom: 80px; -webkit-font-smoothing: antialiased; }
+    .header { background: #0b0e12; color: #fff; border-bottom: 1px solid #1c2430; padding: calc(16px + env(safe-area-inset-top)) 20px 16px; font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
     .content { padding: 16px; }
     .compare { display: flex; gap: 10px; margin-bottom: 16px; }
     .compare figure { flex: 1; }
     .compare img { width: 100%; border-radius: 12px; }
-    .compare figcaption { font-size: 12px; color: #777; text-align: center; margin-top: 4px; }
-    .compare .cmp-label { font-size: 12px; color: #777; margin-bottom: 6px; font-weight: 600; }
-    .day { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-    .day-date { font-size: 13px; font-weight: 600; color: #7A5C3E; margin-bottom: 8px; }
+    .compare figcaption { font-size: 12px; color: #7d8896; text-align: center; margin-top: 4px; }
+    .compare .cmp-label { font-size: 12px; color: #00e676; margin-bottom: 6px; font-weight: 700; }
+    .day { background: #161b22; border: 1px solid #232c38; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+    .day-date { font-size: 13px; font-weight: 700; color: #00e676; margin-bottom: 8px; }
     .day-shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .day-shots figure img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; }
-    .day-shots figcaption { font-size: 11px; color: #999; text-align: center; margin-top: 2px; }
-    .empty { text-align: center; color: #999; padding: 40px 0; }
-    .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #eee; padding-bottom: env(safe-area-inset-bottom); }
-    .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #999; text-decoration: none; }
-    .nav a.active { color: #7A5C3E; font-weight: 600; }
+    .day-shots figcaption { font-size: 11px; color: #7d8896; text-align: center; margin-top: 2px; }
+    .empty { text-align: center; color: #7d8896; padding: 40px 0; }
+    .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #0b0e12; border-top: 1px solid #1c2430; padding-bottom: env(safe-area-inset-bottom); }
+    .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #7d8896; text-decoration: none; }
+    .nav a.active { color: #00e676; font-weight: 700; }
   </style>
 </head>
 <body>

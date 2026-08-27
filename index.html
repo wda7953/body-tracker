@@ -6,23 +6,28 @@
   <title>Body tracker</title>
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0b0e12">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
   <style>
+    /* 深色運動風：黑底 + 螢光綠 + Manrope */
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, sans-serif; background: #FAF7F2; color: #3A2E24; padding-bottom: 80px; }
-    .header { background: #7A5C3E; color: #fff; padding: calc(16px + env(safe-area-inset-top)) 20px 16px; font-size: 18px; font-weight: 600; }
+    body { font-family: "Manrope","Noto Sans TC",system-ui,sans-serif; background: #0e1116; color: #e6edf3; padding-bottom: 80px; -webkit-font-smoothing: antialiased; }
+    .header { background: #0b0e12; color: #fff; border-bottom: 1px solid #1c2430; padding: calc(16px + env(safe-area-inset-top)) 20px 16px; font-size: 18px; font-weight: 800; letter-spacing: -.01em; }
     .content { padding: 16px; }
-    .card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
-    .advice { background: #EEF3EC; border-left: 4px solid #2E7D32; font-size: 14px; line-height: 1.5; }
+    .card { background: #161b22; border: 1px solid #232c38; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    .advice { background: #12251b; border: 1px solid #1e5b3c; border-left: 4px solid #00e676; color: #b6f5d0; font-size: 14px; line-height: 1.5; }
     .row { display: flex; gap: 12px; }
     .row .card { flex: 1; text-align: center; }
-    .stat .label { font-size: 12px; color: #999; margin-bottom: 6px; }
-    .stat .val { font-size: 22px; font-weight: 700; }
-    .stat .sub { font-size: 11px; color: #999; margin-top: 4px; }
-    h2 { font-size: 13px; color: #777; margin: 4px 0 8px; }
-    .legend { font-size: 11px; color: #999; margin-top: 6px; }
-    .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #eee; padding-bottom: env(safe-area-inset-bottom); }
-    .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #999; text-decoration: none; }
-    .nav a.active { color: #7A5C3E; font-weight: 600; }
+    .stat .label { font-size: 12px; color: #7d8896; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+    .stat .val { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+    .stat .sub { font-size: 11px; color: #7d8896; margin-top: 4px; }
+    h2 { font-size: 13px; color: #7d8896; margin: 4px 0 8px; font-weight: 600; }
+    .legend { font-size: 11px; color: #7d8896; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #0b0e12; border-top: 1px solid #1c2430; padding-bottom: env(safe-area-inset-bottom); }
+    .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #7d8896; text-decoration: none; }
+    .nav a.active { color: #00e676; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -118,8 +123,8 @@
       const chartSvg = Chart.lineChartSVG({
         width: 320, height: 150,
         series: [
-          { name: 'raw', color: '#D9C9B6', points: ma.map(m => ({ x: 0, y: m.value })) },
-          { name: 'ma', color: '#7A5C3E', points: ma.map(m => ({ x: 0, y: m.avg })) },
+          { name: 'raw', color: '#2f3b34', points: ma.map(m => ({ x: 0, y: m.value })) },
+          { name: 'ma', color: '#00e676', points: ma.map(m => ({ x: 0, y: m.avg })) },
         ],
         targetY: targetWeight,
       });
