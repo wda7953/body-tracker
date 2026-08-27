@@ -72,7 +72,9 @@ function addDaily(data) {
     const sh = getOrCreateSheet('daily');
     const head = HEADERS.daily;
     const row = head.map(h => data[h] != null ? data[h] : '');
-    const dates = sh.getRange(2, 1, Math.max(sh.getLastRow() - 1, 0), 1).getValues().flat().map(String);
+    const last = sh.getLastRow();
+    // 只有表頭（last<2）時沒有資料列可讀，直接視為找不到、走 append（getRange 列數不得為 0）
+    const dates = last >= 2 ? sh.getRange(2, 1, last - 1, 1).getValues().flat().map(String) : [];
     const idx = dates.indexOf(String(data.date));
     if (idx >= 0) sh.getRange(idx + 2, 1, 1, head.length).setValues([row]);
     else sh.appendRow(row);
