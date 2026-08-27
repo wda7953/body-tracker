@@ -2,13 +2,14 @@
 # 撈 Garmin 昨日（台灣時區）數據 → POST 到 Apps Script addDaily。
 # 失敗會以非 0 結束，讓 workflow 走失敗通知步驟。
 import os, sys, json, datetime, getpass, urllib.request
-from garminconnect import Garmin
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from garmin_login import make_client
 
 def taipei_yesterday():
     tw = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
     return (tw.date() - datetime.timedelta(days=1)).isoformat()
 
-# 有環境變數就用（GitHub Actions 用）；沒有且在終端機互動時才提示輸入（本機測試用）
+# API 端的設定（非 Garmin 帳密）：有環境變數就用，否則終端機互動輸入
 def cred(name, prompt, secret=False):
     v = os.environ.get(name)
     if v: return v
@@ -23,13 +24,11 @@ def dig(d, *path, default=None):
     return d
 
 def main():
-    email = cred('GARMIN_EMAIL', 'Garmin 信箱: ')
-    pw = cred('GARMIN_PASSWORD', 'Garmin 密碼（輸入時不顯示）: ', secret=True)
     api_url = cred('API_URL', 'Apps Script exec 網址: ')
     token = cred('API_TOKEN', 'API token: ')
     date = os.environ.get('FETCH_DATE') or taipei_yesterday()
 
-    g = Garmin(email, pw); g.login()
+    g = make_client()
     stats = g.get_stats(date) or {}
     sleep = g.get_sleep_data(date) or {}
     bb = g.get_body_battery(date, date) or []
