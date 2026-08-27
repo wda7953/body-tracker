@@ -9,7 +9,7 @@ const SS_ID = '';  // 留空＝用容器綁定的試算表；若獨立部署填�
 function ss() { return SS_ID ? SpreadsheetApp.openById(SS_ID) : SpreadsheetApp.getActiveSpreadsheet(); }
 
 const HEADERS = {
-  daily: ['date','tdee_total','active_kcal','bmr_kcal','steps','resting_hr','sleep_score','sleep_hours','avg_stress','body_battery'],
+  daily: ['date','tdee_total','active_kcal','bmr_kcal','steps','resting_hr','sleep_score','sleep_hours','avg_stress','body_battery','training_readiness','hrv_last_night','hrv_status'],
   body:  ['date','weight_kg','waist_cm','photo_front','photo_side','photo_back','note','client_id'],
   settings: ['key','value'],
 };

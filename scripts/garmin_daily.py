@@ -34,6 +34,26 @@ def main():
     except Exception:
         bb_high = None
 
+    # 訓練準備度（0-100，Garmin 綜合 HRV/睡眠/恢復/負荷算出的「今天適合訓練還是休息」）
+    # 這些是較新的 Garmin 功能，套件版本或手錶型號不支援就給 None，不讓整個腳本崩
+    training_readiness = None
+    try:
+        tr = g.get_training_readiness(date)
+        if isinstance(tr, list) and tr: tr = tr[0]
+        if isinstance(tr, dict): training_readiness = tr.get('score')
+    except Exception:
+        training_readiness = None
+
+    hrv_last_night = None
+    hrv_status = None
+    try:
+        hrv = g.get_hrv_data(date) or {}
+        summ = hrv.get('hrvSummary') or {}
+        hrv_last_night = summ.get('lastNightAvg')
+        hrv_status = summ.get('status')
+    except Exception:
+        pass
+
     payload = {
         'date': date,
         'tdee_total':  stats.get('totalKilocalories'),
@@ -45,6 +65,9 @@ def main():
         'sleep_score': dig(sleep, 'dailySleepDTO', 'sleepScores', 'overall', 'value'),
         'sleep_hours': round(sleep_secs / 3600, 2),
         'body_battery': bb_high,
+        'training_readiness': training_readiness,
+        'hrv_last_night': hrv_last_night,
+        'hrv_status': hrv_status,
     }
 
     url = f'{api_url}?action=addDaily&token={token}'

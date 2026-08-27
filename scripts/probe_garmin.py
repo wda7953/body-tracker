@@ -10,6 +10,16 @@ def yday():
 g = Garmin(os.environ['GARMIN_EMAIL'], os.environ['GARMIN_PASSWORD'])
 g.login()
 d = os.environ.get('FETCH_DATE') or yday()
-print('=== get_stats ==='); print(json.dumps(g.get_stats(d), ensure_ascii=False, indent=2)[:4000])
-print('=== get_sleep_data ==='); print(json.dumps(g.get_sleep_data(d), ensure_ascii=False, indent=2)[:2000])
-print('=== get_body_battery ==='); print(json.dumps(g.get_body_battery(d, d), ensure_ascii=False, indent=2)[:2000])
+def show(name, fn):
+    print('=== ' + name + ' ===')
+    try:
+        print(json.dumps(fn(), ensure_ascii=False, indent=2)[:2500])
+    except Exception as e:
+        print('（此方法不支援或出錯：' + str(e) + '）')
+
+show('get_stats', lambda: g.get_stats(d))
+show('get_sleep_data', lambda: g.get_sleep_data(d))
+show('get_body_battery', lambda: g.get_body_battery(d, d))
+# 較新功能：訓練準備度、HRV（版本/手錶不支援會顯示錯誤，屬正常）
+show('get_training_readiness', lambda: g.get_training_readiness(d))
+show('get_hrv_data', lambda: g.get_hrv_data(d))

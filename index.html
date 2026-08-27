@@ -81,6 +81,18 @@
       const weightStalled = kgPerWeek != null && Math.abs(kgPerWeek) < 0.1;
       const advice = Advice.dailyAdvice({ sleepScore, avgStress, bodyBattery, weightKgPerWeek: kgPerWeek, weightStalled });
 
+      // 今日訓練準備：取最新一天的 Garmin 數據（這是「今天該訓練還是休息」的即時快照，非平均）
+      const latestDaily = dailyAsc.length ? dailyAsc[dailyAsc.length - 1] : {};
+      const numOrNull = (v) => (v !== '' && v != null && Number.isFinite(parseFloat(v))) ? parseFloat(v) : null;
+      const trReady = numOrNull(latestDaily.training_readiness);
+      const hrvNight = numOrNull(latestDaily.hrv_last_night);
+      const hrvStatus = latestDaily.hrv_status || null;
+      const hrvZh = { BALANCED: '均衡', UNBALANCED: '失衡', LOW: '偏低', POOR: '差', GOOD: '良好' };
+      const readyLabel = (s) => (s == null || Number.isNaN(s)) ? '—'
+        : s >= 70 ? '✅ 適合訓練'
+        : s >= 40 ? '🟡 可訓練，強度收斂'
+        : '🔴 建議休息／輕鬆活動';
+
       // 體重圖：原始點 + 均線 + 目標線
       // 兩條線都從已依日期排序的 ma 陣列取值（body 分頁可能有補登的舊資料造成順序錯亂，
       // chart.js 是用陣列索引當 x 軸，若原始點不跟均線同一份排序來源會對不齊）
@@ -108,6 +120,17 @@
         <div class="row">
           <div class="card stat"><div class="label">推估攝食</div><div class="val">${(estIntake == null || Number.isNaN(estIntake)) ? '—' : Math.round(estIntake)}</div><div class="sub">kcal/日</div></div>
           <div class="card stat"><div class="label">距目標</div><div class="val">${(curTrend != null && targetWeight != null) ? f(curTrend - targetWeight) : '—'}</div><div class="sub">${proj ? '約 ' + Math.ceil(proj.weeksToGoal) + ' 週・' + proj.etaDate : 'kg'}</div></div>
+        </div>
+        <div class="card">
+          <h2>今日訓練準備</h2>
+          <div style="text-align:center; margin:6px 0">
+            <div class="val" style="font-size:30px">${f(trReady, 0)}</div>
+            <div class="sub" style="font-size:13px; margin-top:4px">${readyLabel(trReady)}</div>
+          </div>
+          <div class="row" style="gap:8px; margin-top:8px">
+            <div class="stat" style="flex:1"><div class="label">昨晚 HRV</div><div class="val" style="font-size:18px">${hrvNight == null ? '—' : Math.round(hrvNight) + ' ms'}</div></div>
+            <div class="stat" style="flex:1"><div class="label">HRV 狀態</div><div class="val" style="font-size:18px">${hrvStatus ? (hrvZh[hrvStatus] || hrvStatus) : '—'}</div></div>
+          </div>
         </div>
         <div class="card">
           <h2>恢復狀態（近3日均）</h2>
