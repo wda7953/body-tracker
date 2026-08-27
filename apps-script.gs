@@ -10,7 +10,7 @@ function ss() { return SS_ID ? SpreadsheetApp.openById(SS_ID) : SpreadsheetApp.g
 
 const HEADERS = {
   daily: ['date','tdee_total','active_kcal','bmr_kcal','steps','resting_hr','sleep_score','sleep_hours','avg_stress','body_battery'],
-  body:  ['date','weight_kg','waist_cm','photo_id','note','client_id'],
+  body:  ['date','weight_kg','waist_cm','photo_front','photo_side','photo_back','note','client_id'],
   settings: ['key','value'],
 };
 
@@ -36,8 +36,13 @@ function doPost(e) {
 
 function getOrCreateSheet(name) {
   let sh = ss().getSheetByName(name);
-  if (!sh) { sh = ss().insertSheet(name); sh.appendRow(HEADERS[name]); }
-  else if (sh.getLastRow() === 0) { sh.appendRow(HEADERS[name]); }
+  if (!sh) { sh = ss().insertSheet(name); sh.appendRow(HEADERS[name]); return sh; }
+  if (sh.getLastRow() === 0) { sh.appendRow(HEADERS[name]); return sh; }
+  // 表頭自癒：欄位定義有變（例如 body 從單張照片升級成正/側/背三張）且尚無資料列時，重寫表頭
+  const want = HEADERS[name];
+  const have = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+  const same = have.length === want.length && want.every((h, i) => String(have[i]) === String(h));
+  if (!same && sh.getLastRow() <= 1) { sh.getRange(1, 1, 1, want.length).setValues([want]); }
   return sh;
 }
 
@@ -75,19 +80,28 @@ function addDaily(data) {
   } finally { lock.releaseLock(); }
 }
 
-// body 以 client_id 去重（重試安全）。帶 photo_base64 就先存 Drive，寫入 photo_id
+// body 以 client_id 去重（重試安全）。正/側/背三張各自帶 base64 就存 Drive，寫入對應 id
 function addBody(data) {
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
     const sh = getOrCreateSheet('body');
-    if (data.client_id) {
-      const ids = sh.getRange(1, 6, sh.getLastRow(), 1).getValues().flat().map(String);
+    const head = HEADERS.body;
+    const cidCol = head.indexOf('client_id') + 1;  // client_id 欄位位置（隨欄位定義自動對應）
+    if (data.client_id && sh.getLastRow() >= 1) {
+      const ids = sh.getRange(1, cidCol, sh.getLastRow(), 1).getValues().flat().map(String);
       if (ids.indexOf(String(data.client_id)) >= 0) return { ok: true, deduped: true };
     }
-    let photoId = data.photo_id || '';
-    if (data.photo_base64) photoId = savePhoto(data.photo_base64, String(data.date));
-    sh.appendRow([data.date, data.weight_kg || '', data.waist_cm || '', photoId, data.note || '', data.client_id || '']);
-    return { ok: true, photo_id: photoId };
+    // 三個角度：有 base64 就存 Drive 拿 id，否則沿用傳入的既有 id（皆選填）
+    const front = data.photo_front_base64 ? savePhoto(data.photo_front_base64, data.date + '_front') : (data.photo_front || '');
+    const side  = data.photo_side_base64  ? savePhoto(data.photo_side_base64,  data.date + '_side')  : (data.photo_side  || '');
+    const back  = data.photo_back_base64  ? savePhoto(data.photo_back_base64,  data.date + '_back')  : (data.photo_back  || '');
+    const rowObj = {
+      date: data.date, weight_kg: data.weight_kg || '', waist_cm: data.waist_cm || '',
+      photo_front: front, photo_side: side, photo_back: back,
+      note: data.note || '', client_id: data.client_id || '',
+    };
+    sh.appendRow(head.map(h => rowObj[h] != null ? rowObj[h] : ''));
+    return { ok: true, photos: { front, side, back } };
   } finally { lock.releaseLock(); }
 }
 

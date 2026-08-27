@@ -32,9 +32,15 @@
       <input type="number" step="0.1" id="weight" inputmode="decimal">
       <label>腰圍 (cm，選填)</label>
       <input type="number" step="0.1" id="waist" inputmode="decimal">
-      <label>照片（選填）</label>
-      <input type="file" id="photo" accept="image/*" capture="environment">
-      <img class="preview" id="preview" style="display:none">
+      <label>正面照（選填）</label>
+      <input type="file" id="photo_front" accept="image/*">
+      <img class="preview" id="preview_front" style="display:none">
+      <label>側面照（選填）</label>
+      <input type="file" id="photo_side" accept="image/*">
+      <img class="preview" id="preview_side" style="display:none">
+      <label>背面照（選填）</label>
+      <input type="file" id="photo_back" accept="image/*">
+      <img class="preview" id="preview_back" style="display:none">
       <label>備註（選填）</label>
       <input type="text" id="note">
       <button class="save" id="save">儲存</button>
@@ -53,33 +59,35 @@
     const pad2 = (n) => String(n).padStart(2, '0');
     const d0 = new Date();
     document.getElementById('date').value = `${d0.getFullYear()}-${pad2(d0.getMonth() + 1)}-${pad2(d0.getDate())}`;
-    let photoBase64 = null;
-    document.getElementById('photo').addEventListener('change', (e) => {
-      const f = e.target.files[0]; if (!f) return;
-      const msg = document.getElementById('msg');
-      const resetPhoto = () => {
-        photoBase64 = null;
-        document.getElementById('photo').value = '';
-        document.getElementById('preview').style.display = 'none';
-        msg.textContent = '圖片讀取失敗，換一張試試'; msg.style.color = '#C62828';
-      };
-      // 壓縮：長邊縮到 1080，JPEG 0.7，避免 base64 過大
-      const img = new Image(); const rd = new FileReader();
-      rd.onerror = resetPhoto;
-      img.onerror = resetPhoto;
-      rd.onload = () => { img.onload = () => {
-        const max = 1080; let { width: w, height: h } = img;
-        if (Math.max(w, h) > max) { const r = max / Math.max(w, h); w = Math.round(w*r); h = Math.round(h*r); }
-        const c = document.createElement('canvas'); c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0, w, h);
-        photoBase64 = c.toDataURL('image/jpeg', 0.7);
-        const p = document.getElementById('preview'); p.src = photoBase64; p.style.display = 'block';
-      }; img.src = rd.result; };
-      rd.readAsDataURL(f);
+    const msg = document.getElementById('msg');
+    // 三個角度共用同一套：壓縮＋預覽＋錯誤處理。base64 存在 photoData[angle]
+    const angles = ['front', 'side', 'back'];
+    const photoData = { front: null, side: null, back: null };
+    angles.forEach((a) => {
+      const input = document.getElementById('photo_' + a);
+      const preview = document.getElementById('preview_' + a);
+      input.addEventListener('change', (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        const resetPhoto = () => {
+          photoData[a] = null; input.value = ''; preview.style.display = 'none';
+          msg.textContent = '圖片讀取失敗，換一張試試'; msg.style.color = '#C62828';
+        };
+        // 壓縮：長邊縮到 1080，JPEG 0.7，避免 base64 過大
+        const img = new Image(); const rd = new FileReader();
+        rd.onerror = resetPhoto; img.onerror = resetPhoto;
+        rd.onload = () => { img.onload = () => {
+          const max = 1080; let { width: w, height: h } = img;
+          if (Math.max(w, h) > max) { const r = max / Math.max(w, h); w = Math.round(w*r); h = Math.round(h*r); }
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          photoData[a] = c.toDataURL('image/jpeg', 0.7);
+          preview.src = photoData[a]; preview.style.display = 'block';
+        }; img.src = rd.result; };
+        rd.readAsDataURL(f);
+      });
     });
     document.getElementById('save').addEventListener('click', async () => {
       const weight = document.getElementById('weight').value;
-      const msg = document.getElementById('msg');
       if (!weight) { msg.textContent = '請填體重'; msg.style.color = '#C62828'; return; }
       msg.textContent = '儲存中…'; msg.style.color = '#777';
       const payload = {
@@ -87,15 +95,19 @@
         weight_kg: parseFloat(weight),
         waist_cm: document.getElementById('waist').value ? parseFloat(document.getElementById('waist').value) : '',
         note: document.getElementById('note').value,
-        photo_base64: photoBase64 || '',
+        photo_front_base64: photoData.front || '',
+        photo_side_base64: photoData.side || '',
+        photo_back_base64: photoData.back || '',
         client_id: API.genClientId(),
       };
       try {
         const r = await API.apiPost('addBody', payload);
         if (r.ok) { msg.textContent = '已儲存 ✓'; msg.style.color = '#2E7D32';
           document.getElementById('weight').value = ''; document.getElementById('waist').value = '';
-          document.getElementById('note').value = ''; photoBase64 = null;
-          document.getElementById('preview').style.display = 'none'; }
+          document.getElementById('note').value = '';
+          angles.forEach((a) => { photoData[a] = null; document.getElementById('photo_' + a).value = '';
+            document.getElementById('preview_' + a).style.display = 'none'; });
+        }
         else { msg.textContent = '失敗：' + r.error; msg.style.color = '#C62828'; }
       } catch (err) { msg.textContent = '網路錯誤：' + err.message; msg.style.color = '#C62828'; }
     });

@@ -14,9 +14,12 @@
     .compare figure { flex: 1; }
     .compare img { width: 100%; border-radius: 12px; }
     .compare figcaption { font-size: 12px; color: #777; text-align: center; margin-top: 4px; }
-    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .grid figure img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; }
-    .grid figcaption { font-size: 10px; color: #999; text-align: center; }
+    .compare .cmp-label { font-size: 12px; color: #777; margin-bottom: 6px; font-weight: 600; }
+    .day { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+    .day-date { font-size: 13px; font-weight: 600; color: #7A5C3E; margin-bottom: 8px; }
+    .day-shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .day-shots figure img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; }
+    .day-shots figcaption { font-size: 11px; color: #999; text-align: center; margin-top: 2px; }
     .empty { text-align: center; color: #999; padding: 40px 0; }
     .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #eee; padding-bottom: env(safe-area-inset-bottom); }
     .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #999; text-decoration: none; }
@@ -37,20 +40,30 @@
     (async () => {
       const el = document.getElementById('content');
       let res; try { res = await API.apiGet('getAll'); } catch (e) { el.innerHTML = '<div class="empty">載入失敗</div>'; return; }
-      const photos = (res.data.body || []).filter(b => b.photo_id)
-        .map(b => ({ date: String(b.date).slice(0, 10), id: b.photo_id }))
+      // 每筆記錄可有正/側/背三張，至少一張才顯示
+      const entries = (res.data.body || [])
+        .map(b => ({ date: String(b.date).slice(0, 10), front: b.photo_front, side: b.photo_side, back: b.photo_back }))
+        .filter(e => e.front || e.side || e.back)
         .sort((a, b) => a.date < b.date ? -1 : 1);
-      if (!photos.length) { el.innerHTML = '<div class="empty">還沒有照片，去「記錄」拍第一張吧</div>'; return; }
-      const first = photos[0], last = photos[photos.length - 1];
+      if (!entries.length) { el.innerHTML = '<div class="empty">還沒有照片，去「記錄」拍第一張吧</div>'; return; }
+
       let html = '';
-      if (photos.length >= 2) {
+      // 正面對比：最早 vs 最新（都有正面照時才顯示）
+      const fronts = entries.filter(e => e.front);
+      if (fronts.length >= 2) {
+        const first = fronts[0], last = fronts[fronts.length - 1];
         html += `<div class="compare">
-          <figure><img src="${url(first.id)}" loading="lazy"><figcaption>起點 ${first.date}</figcaption></figure>
-          <figure><img src="${url(last.id)}" loading="lazy"><figcaption>最新 ${last.date}</figcaption></figure>
+          <figure><div class="cmp-label">起點正面 ${first.date}</div><img src="${url(first.front)}" loading="lazy"></figure>
+          <figure><div class="cmp-label">最新正面 ${last.date}</div><img src="${url(last.front)}" loading="lazy"></figure>
         </div>`;
       }
-      html += '<div class="grid">' + photos.slice().reverse().map(p =>
-        `<figure><img src="${url(p.id)}" loading="lazy"><figcaption>${p.date}</figcaption></figure>`).join('') + '</div>';
+      // 各日期（最新在前），顯示該日有的角度
+      html += entries.slice().reverse().map(e => {
+        const shots = [['正面', e.front], ['側面', e.side], ['背面', e.back]].filter(([l, id]) => id);
+        return `<div class="day"><div class="day-date">${e.date}</div><div class="day-shots">` +
+          shots.map(([l, id]) => `<figure><img src="${url(id)}" loading="lazy"><figcaption>${l}</figcaption></figure>`).join('') +
+          `</div></div>`;
+      }).join('');
       el.innerHTML = html;
     })();
   </script>
