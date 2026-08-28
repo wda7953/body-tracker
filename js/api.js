@@ -2,16 +2,27 @@
 // 🔒 隱私版：token（密碼）不再寫在原始碼，改由使用者開 App 時輸入，存在本機瀏覽器 localStorage。
 //    公開原始碼裡只有後端網址、沒有密碼；沒密碼的人打開只會看到鎖屏，撈不到任何資料。
 const API_URL = 'https://script.google.com/macros/s/AKfycbw2xAshmV1x9tzj2dgR2XKPyX2dHgH1TU6NnLLmYfuP6ffVQwr77MQ77s7LjTHr9WytQA/exec';
-const TOKEN_KEY = 'bt_token';  // localStorage 鍵名
+const TOKEN_KEY = 'bt_token';   // localStorage 鍵名（密碼）
+const TS_KEY = 'bt_token_ts';   // 上次成功進入 App 的時間戳
+const TTL_MS = 60 * 60 * 1000;  // 逾時：超過 1 小時沒開 App 就要重輸密碼
 
 function getToken() {
   try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
 }
 function setToken(t) {
-  try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {}
+  try { localStorage.setItem(TOKEN_KEY, t); touch(); } catch (e) {}
 }
 function clearToken() {
-  try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+  try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(TS_KEY); } catch (e) {}
+}
+function touch() {  // 更新活躍時間（每次成功進入 App 就往後延一小時）
+  try { localStorage.setItem(TS_KEY, String(Date.now())); } catch (e) {}
+}
+function isExpired() {
+  try {
+    const ts = parseInt(localStorage.getItem(TS_KEY) || '0', 10);
+    return !ts || (Date.now() - ts > TTL_MS);
+  } catch (e) { return true; }
 }
 
 async function apiGet(action, params = {}) {
@@ -74,8 +85,9 @@ function _lockScreen(message) {
 // App 進入點：確認手上的密碼有效，無效就鎖屏。三頁在載入資料前先 await requireAuth()
 async function requireAuth() {
   if (!getToken()) { _lockScreen(''); return false; }
+  if (isExpired()) { clearToken(); _lockScreen('已超過 1 小時未使用，請重新輸入密碼'); return false; }
   const res = await apiGet('getSettings');
-  if (res && res.ok) return true;
+  if (res && res.ok) { touch(); return true; }   // 進得來就把逾時往後延一小時
   clearToken(); _lockScreen('密碼已失效，請重新輸入'); return false;
 }
 
