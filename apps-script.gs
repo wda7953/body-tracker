@@ -1,12 +1,16 @@
 // body-tracker/apps-script.gs
 // 身體追蹤 PWA 後端。部署為 Web App（執行身分：我；存取權：任何人）。
-// 安全靠共享密鑰 token：前端與 Garmin 腳本每次呼叫都要帶 ?token=，不對就擋。
-// ⚠️ 個人低風險資料用，token 在前端原始碼看得到，勿放敏感個資。
+// 安全靠共享密鑰 token：前端每次呼叫都要帶 ?token=，不對就擋。
+// 🔒 隱私強化版：照片存 Drive 為「私有」，只能透過本後端帶對 token 才讀得到（getPhoto 代理）。
+//    token 不再寫在前端原始碼，改由使用者開 App 時輸入、存在瀏覽器；公開原始碼看不到密碼。
 
-const API_TOKEN = 'body_1rx9a29p2h4z';  // 密鑰，前端 js/api.js 與 GitHub Secret 要一致
+// ★★★ 這裡改成你自己的密碼（12 字以上、英數混合，別人猜不到）。與前端登入、GitHub Secret 要一致 ★★★
+const API_TOKEN = '★改成你的密碼★';
 
 const SS_ID = '';  // 留空＝用容器綁定的試算表；若獨立部署填入「身體追蹤」試算表 ID
 function ss() { return SS_ID ? SpreadsheetApp.openById(SS_ID) : SpreadsheetApp.getActiveSpreadsheet(); }
+
+const PHOTO_FOLDER = 'body-tracker-photos';  // 照片資料夾名稱（私有）
 
 const HEADERS = {
   daily: ['date','tdee_total','active_kcal','bmr_kcal','steps','resting_hr','sleep_score','sleep_hours','avg_stress','body_battery','training_readiness','hrv_last_night','hrv_status'],
@@ -19,6 +23,7 @@ function doGet(e) {
   try {
     if (e.parameter.action === 'getAll')      return jsonOk(getAll());
     if (e.parameter.action === 'getSettings') return jsonOk(getSettings());
+    if (e.parameter.action === 'getPhoto')    return jsonOk(getPhoto(e.parameter.id));  // 代理讀私有照片
     return jsonErr('unknown action');
   } catch (err) { return jsonErr(err.message); }
 }
@@ -107,15 +112,40 @@ function addBody(data) {
   } finally { lock.releaseLock(); }
 }
 
+function photoFolder() {
+  const it = DriveApp.getFoldersByName(PHOTO_FOLDER);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(PHOTO_FOLDER);
+}
+
 function savePhoto(base64, dateStr) {
-  const folderName = 'body-tracker-photos';
-  const it = DriveApp.getFoldersByName(folderName);
-  const folder = it.hasNext() ? it.next() : DriveApp.createFolder(folderName);
   const clean = base64.replace(/^data:image\/\w+;base64,/, '');
   const blob = Utilities.newBlob(Utilities.base64Decode(clean), 'image/jpeg', dateStr + '_' + Date.now() + '.jpg');
-  const file = folder.createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const file = photoFolder().createFile(blob);
+  // 🔒 私有：不設任何公開分享。檔案只有本後端（以你的身分執行）能讀。
   return file.getId();
+}
+
+// 代理讀圖：帶對 token 才會走到這（doGet 已驗）。回傳 base64 data URI，前端塞進 <img>
+function getPhoto(id) {
+  if (!id) return { dataUri: '' };
+  const file = DriveApp.getFileById(id);
+  const blob = file.getBlob();
+  const b64 = Utilities.base64Encode(blob.getBytes());
+  return { dataUri: 'data:' + blob.getContentType() + ';base64,' + b64 };
+}
+
+// ── 一次性維護：把資料夾內所有舊照片改回私有（撤銷之前的「任何人有連結可看」）──
+// 用法：在 Apps Script 編輯器上方函式下拉選 revokeAllPhotoSharing → 執行一次即可。
+function revokeAllPhotoSharing() {
+  const files = photoFolder().getFiles();
+  let n = 0;
+  while (files.hasNext()) {
+    const f = files.next();
+    try { f.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE); n++; }
+    catch (err) { Logger.log('skip ' + f.getName() + ': ' + err.message); }
+  }
+  Logger.log('已把 ' + n + ' 張照片改回私有');
+  return n;
 }
 
 function getSettings() {

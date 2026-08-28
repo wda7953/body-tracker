@@ -16,9 +16,9 @@ jobs:
         env:
           # 雲端不能輸驗證碼，改用本機產生的 token（GARMINTOKENS secret＝garmin_login.py 印出的 JSON）
           GARMINTOKENS: ${{ secrets.GARMINTOKENS }}
-          # 以下兩個非機密（本來就公開在 js/api.js），直接寫進來省設定
+          # API_URL 非機密（後端網址，沒密碼也沒用）；API_TOKEN 是密碼，改讀 GitHub Secret，不再明文
           API_URL: 'https://script.google.com/macros/s/AKfycbw2xAshmV1x9tzj2dgR2XKPyX2dHgH1TU6NnLLmYfuP6ffVQwr77MQ77s7LjTHr9WytQA/exec'
-          API_TOKEN: 'body_1rx9a29p2h4z'
+          API_TOKEN: ${{ secrets.BODY_API_TOKEN }}
         run: python scripts/garmin_daily.py
       - name: 失敗通知（LINE push）
         if: failure()

@@ -61,6 +61,7 @@
   </nav>
   <script src="js/api.js"></script>
   <script>
+    API.requireAuth();   // 沒密碼先鎖屏（蓋住整頁）
     // 台灣早上量體重常在 08:00 前，toISOString() 會轉成 UTC 而倒退一天（NEVER-#2 時區 bug），
     // 改用本地年/月/日組字串，與 calc.js 的 formatLocalDate 邏輯一致
     const pad2 = (n) => String(n).padStart(2, '0');

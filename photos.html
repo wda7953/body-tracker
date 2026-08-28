@@ -41,8 +41,10 @@
   </nav>
   <script src="js/api.js"></script>
   <script>
-    const url = (id) => `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
+    // 私有照片：先放佔位 img（帶 data-pid），渲染後再逐一向後端代理要圖填 src
+    const imgTag = (id) => `<img data-pid="${id}" loading="lazy" alt="">`;
     (async () => {
+      if (!(await API.requireAuth())) return;   // 沒密碼先鎖屏
       const el = document.getElementById('content');
       let res; try { res = await API.apiGet('getAll'); } catch (e) { el.innerHTML = '<div class="empty">載入失敗</div>'; return; }
       // 每筆記錄可有正/側/背三張，至少一張才顯示
@@ -58,18 +60,23 @@
       if (fronts.length >= 2) {
         const first = fronts[0], last = fronts[fronts.length - 1];
         html += `<div class="compare">
-          <figure><div class="cmp-label">起點正面 ${first.date}</div><img src="${url(first.front)}" loading="lazy"></figure>
-          <figure><div class="cmp-label">最新正面 ${last.date}</div><img src="${url(last.front)}" loading="lazy"></figure>
+          <figure><div class="cmp-label">起點正面 ${first.date}</div>${imgTag(first.front)}</figure>
+          <figure><div class="cmp-label">最新正面 ${last.date}</div>${imgTag(last.front)}</figure>
         </div>`;
       }
       // 各日期（最新在前），顯示該日有的角度
       html += entries.slice().reverse().map(e => {
         const shots = [['正面', e.front], ['側面', e.side], ['背面', e.back]].filter(([l, id]) => id);
         return `<div class="day"><div class="day-date">${e.date}</div><div class="day-shots">` +
-          shots.map(([l, id]) => `<figure><img src="${url(id)}" loading="lazy"><figcaption>${l}</figcaption></figure>`).join('') +
+          shots.map(([l, id]) => `<figure>${imgTag(id)}<figcaption>${l}</figcaption></figure>`).join('') +
           `</div></div>`;
       }).join('');
       el.innerHTML = html;
+      // 逐張向後端代理要私有照片（帶密碼），填進對應 img
+      for (const img of el.querySelectorAll('img[data-pid]')) {
+        const uri = await API.apiGetPhoto(img.dataset.pid);
+        if (uri) img.src = uri;
+      }
     })();
   </script>
 </body>
