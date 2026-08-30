@@ -29,6 +29,19 @@
     .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #0b0e12; border-top: 1px solid #1c2430; padding-bottom: env(safe-area-inset-bottom); }
     .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #7d8896; text-decoration: none; }
     .nav a.active { color: #00e676; font-weight: 700; }
+    /* 生理期狀態卡（洋紅，跟螢光綠不衝突） */
+    .cyc { background: linear-gradient(180deg, rgba(255,92,138,.10), rgba(255,92,138,.03)); border-color: rgba(255,92,138,.35); }
+    .cyc .top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+    .cyc .dayn { font-size: 24px; font-weight: 800; color: #fff; letter-spacing: -.02em; }
+    .cyc .dayn small { font-size: 13px; color: #ff5c8a; font-weight: 700; margin-left: 4px; }
+    .cyc .next { text-align: right; }
+    .cyc .next .k { font-size: 11px; color: #7d8896; }
+    .cyc .next .v { font-size: 15px; font-weight: 800; color: #ff5c8a; font-variant-numeric: tabular-nums; }
+    .cyc .track { height: 8px; border-radius: 6px; background: #1b2129; overflow: hidden; position: relative; }
+    .cyc .track .fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #ff5c8a, #ff8db0); }
+    .cyc .track .now { position: absolute; top: -3px; width: 2px; height: 14px; background: #fff; border-radius: 2px; }
+    .cyc .scale { display: flex; justify-content: space-between; font-size: 10px; color: #7d8896; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .cyc .empty { font-size: 13px; color: #ffbcd0; line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -50,7 +63,7 @@
       let res;
       try { res = await API.apiGet('getAll'); } catch (e) { el.innerHTML = '<div class="card">載入失敗：' + e.message + '</div>'; return; }
       if (!res.ok) { el.innerHTML = '<div class="card">錯誤：' + res.error + '</div>'; return; }
-      const { daily, body, settings } = res.data;
+      const { daily, body, cycle, settings } = res.data;
       const setMap = {}; (settings || []).forEach(s => setMap[s.key] = s.value);
       const targetWeightRaw = setMap.target_weight ? parseFloat(setMap.target_weight) : null;
       const targetWeight = Number.isNaN(targetWeightRaw) ? null : targetWeightRaw;
@@ -63,6 +76,17 @@
         .map(b => ({ date: String(b.date).slice(0, 10), value: parseFloat(b.weight_kg) }))
         .filter(w => Number.isFinite(w.value));
       const ma = Calc.movingAverage(weights, 7);
+
+      // ── 生理期／週期 ──
+      const periodDays = parseInt(setMap.period_days, 10) || 7;   // 經期天數（預設 7）
+      const cycleDays = parseInt(setMap.cycle_days, 10) || 30;    // 週期天數（預設 30）
+      const cycleStarts = (cycle || []).map(c => String(c.date).slice(0, 10)).filter(Boolean);
+      const cs = Calc.cycleStats(cycleStarts, cycleDays);         // {avgCycle,lastStart,predictedNext,currentDay,estimated}
+      const periodSet = Calc.periodDateSet(cycleStarts, periodDays);
+      // 體重圖標記：把「每個體重點的日期是否落在生理期」壓成色塊（分數索引，對齊折線）
+      const periodBandList = Calc.periodBands(ma.map(m => periodSet.has(m.date)));
+      const todayLocal = Calc.formatLocalDate(new Date());
+      const inPeriodToday = periodSet.has(todayLocal);
 
       // 近 14 天窗口算趨勢，避免整段歷史稀釋
       const recentMa = ma.slice(-14);
@@ -129,15 +153,45 @@
           { name: 'ma', color: '#00e676', points: ma.map(m => ({ x: 0, y: m.avg })) },
         ],
         targetY: targetWeight,
+        bands: periodBandList,   // 生理期那幾天的淡洋紅背景
       });
 
       const f = (n, d = 1) => (n == null || Number.isNaN(n)) ? '—' : Number(n).toFixed(d);
+
+      // 生理期狀態卡
+      const md = (s) => { const p = String(s).slice(0, 10).split('-'); return `${+p[1]}/${+p[2]}`; };
+      let cycleCard;
+      if (cs.lastStart) {
+        const daysUntil = Math.round((Calc.parseLocalDate(cs.predictedNext) - Calc.parseLocalDate(todayLocal)) / 86400000);
+        const pct = Math.max(0, Math.min(100, Math.round((cs.currentDay / cs.avgCycle) * 100)));
+        const scaleMid = daysUntil > 0 ? `還有 ${daysUntil} 天` : daysUntil === 0 ? '預計今天' : `已延 ${-daysUntil} 天`;
+        cycleCard = `
+        <div class="card cyc">
+          <div class="top">
+            <div class="dayn">週期第 ${cs.currentDay} <small>天</small></div>
+            <div class="next"><div class="k">預計下次${cs.estimated ? '（預估）' : ''}</div><div class="v">${md(cs.predictedNext)}</div></div>
+          </div>
+          <div class="track"><div class="fill" style="width:${pct}%"></div><div class="now" style="left:${pct}%"></div></div>
+          <div class="scale"><span>第1天</span><span>${scaleMid}</span><span>${cs.avgCycle}天</span></div>
+        </div>`;
+      } else {
+        cycleCard = `
+        <div class="card cyc">
+          <div class="empty">🩸 還沒有生理期紀錄。來的那天到「記錄」頁點一下「今天生理期來了」，這裡就會顯示週期並標在體重圖上。</div>
+        </div>`;
+      }
+      const periodNote = inPeriodToday
+        ? `<div class="card advice" style="background:#2a1620;border-color:#5b1e3c;border-left-color:#ff5c8a;color:#ffbcd0">🩸 這幾天是生理期，體重小幅上升多半是水腫、不是變胖，別急著調飲食。</div>`
+        : '';
+
       el.innerHTML = `
         <div class="card advice">💡 ${advice}</div>
+        ${cycleCard}
+        ${periodNote}
         <div class="card">
           <h2>體重趨勢（原始・7日均線・目標）</h2>
           ${chartSvg}
-          <div class="legend">趨勢 ${kgPerWeek == null ? '—' : (kgPerWeek >= 0 ? '+' : '') + f(kgPerWeek, 2) + ' kg/週'}　目前均線 ${f(curTrend)} kg</div>
+          <div class="legend">趨勢 ${kgPerWeek == null ? '—' : (kgPerWeek >= 0 ? '+' : '') + f(kgPerWeek, 2) + ' kg/週'}　目前均線 ${f(curTrend)} kg${periodBandList.length ? '　<span style="color:#ff5c8a">▮</span> 生理期' : ''}</div>
         </div>
         <div class="row">
           <div class="card stat"><div class="label">本週實際缺口</div><div class="val">${(dailyBal == null || Number.isNaN(dailyBal)) ? '—' : Math.round(dailyBal)}</div><div class="sub">kcal/日（負=缺口）</div></div>

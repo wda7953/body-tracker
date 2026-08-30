@@ -15,6 +15,7 @@ const PHOTO_FOLDER = 'body-tracker-photos';  // 照片資料夾名稱（私有�
 const HEADERS = {
   daily: ['date','tdee_total','active_kcal','bmr_kcal','steps','resting_hr','sleep_score','sleep_hours','avg_stress','body_battery','training_readiness','hrv_last_night','hrv_status'],
   body:  ['date','weight_kg','waist_cm','photo_front','photo_side','photo_back','note','client_id'],
+  cycle: ['date','client_id'],   // 生理期「開始日」（每次來的第一天）；期間長度/週期天數放 settings
   settings: ['key','value'],
 };
 
@@ -34,6 +35,7 @@ function doPost(e) {
   try {
     if (e.parameter.action === 'addDaily')    return jsonOk(addDaily(data));
     if (e.parameter.action === 'addBody')     return jsonOk(addBody(data));
+    if (e.parameter.action === 'addCycle')    return jsonOk(addCycle(data));
     if (e.parameter.action === 'setSetting')  return jsonOk(setSetting(data));
     return jsonErr('unknown action');
   } catch (err) { return jsonErr(err.message); }
@@ -67,7 +69,7 @@ function readAll(name) {
 }
 
 function getAll() {
-  return { daily: readAll('daily'), body: readAll('body'), settings: readAll('settings') };
+  return { daily: readAll('daily'), body: readAll('body'), cycle: readAll('cycle'), settings: readAll('settings') };
 }
 
 // daily 依 date upsert（同日覆蓋），避免排程重跑產生重複列
@@ -109,6 +111,27 @@ function addBody(data) {
     };
     sh.appendRow(head.map(h => rowObj[h] != null ? rowObj[h] : ''));
     return { ok: true, photos: { front, side, back } };
+  } finally { lock.releaseLock(); }
+}
+
+// cycle：記錄生理期「開始日」。以 client_id 去重（重試安全）；同一天已有紀錄也視為已記錄（避免同日重複點）
+function addCycle(data) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const sh = getOrCreateSheet('cycle');
+    const head = HEADERS.cycle;
+    const cidCol = head.indexOf('client_id'), dateCol = head.indexOf('date');
+    if (sh.getLastRow() >= 2) {
+      const rows = sh.getRange(2, 1, sh.getLastRow() - 1, head.length).getValues();
+      const tz = Session.getScriptTimeZone();
+      for (const r of rows) {
+        if (data.client_id && String(r[cidCol]) === String(data.client_id)) return { ok: true, deduped: true };
+        const rd = (r[dateCol] instanceof Date) ? Utilities.formatDate(r[dateCol], tz, 'yyyy-MM-dd') : String(r[dateCol]);
+        if (rd === String(data.date)) return { ok: true, deduped: 'same-date' };
+      }
+    }
+    sh.appendRow(head.map(h => data[h] != null ? data[h] : ''));
+    return { ok: true, added: data.date };
   } finally { lock.releaseLock(); }
 }
 

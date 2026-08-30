@@ -22,6 +22,9 @@
     input[type=number]:focus, input[type=date]:focus, input[type=text]:focus { outline: none; border-color: #00e676; }
     input[type=file] { color: #9aa4b2; font-size: 13px; }
     button.save { width: 100%; padding: 14px; background: #00e676; color: #06210f; border: none; border-radius: 12px; font-size: 16px; font-weight: 800; margin-top: 20px; letter-spacing: .01em; }
+    button.period { width: 100%; padding: 14px; background: rgba(255,92,138,.12); color: #ffd0de; border: 1px solid rgba(255,92,138,.5); border-radius: 12px; font-size: 16px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 9px; letter-spacing: .01em; }
+    button.period .dot { width: 10px; height: 10px; border-radius: 50%; background: #ff5c8a; box-shadow: 0 0 0 4px rgba(255,92,138,.22); }
+    .row { display: flex; gap: 12px; }
     .msg { text-align: center; margin-top: 12px; font-size: 14px; min-height: 20px; }
     img.preview { max-width: 100%; border-radius: 10px; margin-top: 8px; }
     .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #0b0e12; border-top: 1px solid #1c2430; padding-bottom: env(safe-area-inset-bottom); }
@@ -52,6 +55,20 @@
       <input type="text" id="note">
       <button class="save" id="save">儲存</button>
       <div class="msg" id="msg"></div>
+    </div>
+
+    <!-- 生理期記錄 -->
+    <div class="card">
+      <h2 style="font-size:13px;color:#7d8896;margin:0 0 4px;font-weight:600">生理期</h2>
+      <p style="font-size:12px;color:#7d8896;margin:0 0 12px;line-height:1.5">來的那天點一下就好，系統會自動算週期並標在體重圖上。</p>
+      <button class="period" id="periodBtn"><span class="dot"></span>今天生理期來了</button>
+      <div class="msg" id="periodMsg"></div>
+      <div class="row">
+        <div style="flex:1"><label>經期天數</label><input type="number" step="1" id="periodDays" inputmode="numeric" placeholder="7"></div>
+        <div style="flex:1"><label>週期天數</label><input type="number" step="1" id="cycleDays" inputmode="numeric" placeholder="30"></div>
+      </div>
+      <button class="save" id="saveSettings" style="background:#232c38;color:#e6edf3">儲存設定</button>
+      <div class="msg" id="settingsMsg"></div>
     </div>
   </div>
   <nav class="nav">
@@ -118,6 +135,42 @@
         }
         else { msg.textContent = '失敗：' + r.error; msg.style.color = '#C62828'; }
       } catch (err) { msg.textContent = '網路錯誤：' + err.message; msg.style.color = '#C62828'; }
+    });
+
+    // ── 生理期記錄 ──
+    const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+    const periodMsg = document.getElementById('periodMsg');
+    document.getElementById('periodBtn').addEventListener('click', async () => {
+      periodMsg.textContent = '記錄中…'; periodMsg.style.color = '#777';
+      try {
+        const r = await API.apiPost('addCycle', { date: todayStr(), client_id: API.genClientId() });
+        if (r.ok) {
+          periodMsg.style.color = '#2E7D32';
+          periodMsg.textContent = r.deduped ? '今天已經記錄過了 ✓' : ('已記錄 ' + todayStr() + ' ✓');
+        } else { periodMsg.textContent = '失敗：' + r.error; periodMsg.style.color = '#C62828'; }
+      } catch (err) { periodMsg.textContent = '網路錯誤：' + err.message; periodMsg.style.color = '#C62828'; }
+    });
+
+    // 設定：載入時把目前的經期/週期天數帶進欄位
+    const settingsMsg = document.getElementById('settingsMsg');
+    (async () => {
+      try {
+        const res = await API.apiGet('getSettings');
+        if (res && res.ok) {
+          if (res.data.period_days) document.getElementById('periodDays').value = res.data.period_days;
+          if (res.data.cycle_days) document.getElementById('cycleDays').value = res.data.cycle_days;
+        }
+      } catch (e) {}
+    })();
+    document.getElementById('saveSettings').addEventListener('click', async () => {
+      const pd = document.getElementById('periodDays').value;
+      const cd = document.getElementById('cycleDays').value;
+      settingsMsg.textContent = '儲存中…'; settingsMsg.style.color = '#777';
+      try {
+        if (pd) await API.apiPost('setSetting', { key: 'period_days', value: parseInt(pd, 10) });
+        if (cd) await API.apiPost('setSetting', { key: 'cycle_days', value: parseInt(cd, 10) });
+        settingsMsg.textContent = '設定已儲存 ✓'; settingsMsg.style.color = '#2E7D32';
+      } catch (err) { settingsMsg.textContent = '網路錯誤：' + err.message; settingsMsg.style.color = '#C62828'; }
     });
   </script>
 </body>

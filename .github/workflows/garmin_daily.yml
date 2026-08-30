@@ -31,3 +31,19 @@ jobs:
               "to": "${{ secrets.LINE_USER_ID }}",
               "messages": [{"type":"text","text":"⚠️ Body tracker：Garmin 每日撈取失敗，請到 GitHub → Actions → garmin-daily → Run workflow 手動補跑。"}]
             }'
+
+  # 生理期提醒：獨立 job，不依賴 Garmin 撈取成功與否，每天各自判斷「預計下次是否還有 2 天」
+  cycle-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install requests
+      - name: 生理期提前提醒
+        env:
+          API_URL: 'https://script.google.com/macros/s/AKfycbw2xAshmV1x9tzj2dgR2XKPyX2dHgH1TU6NnLLmYfuP6ffVQwr77MQ77s7LjTHr9WytQA/exec'
+          API_TOKEN: ${{ secrets.BODY_API_TOKEN }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python scripts/cycle_reminder.py

@@ -46,6 +46,62 @@ function formatLocalDate(dt) {
   return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
 }
 
+// 把 'YYYY-MM-DD' 解析成「本地」午夜（加 T00:00:00，避免被當 UTC 午夜而在正時區位移一天）
+function parseLocalDate(s) { return new Date(String(s).slice(0, 10) + 'T00:00:00'); }
+
+// ── 生理期／週期計算（純函式，Node 與瀏覽器共用，可測試）──
+// startDates: 生理期「開始日」字串陣列 'YYYY-MM-DD'（順序不拘）
+// 回傳 { avgCycle, lastStart, predictedNext, currentDay, estimated }
+//  - 資料 0 筆：全部給 null（除了 avgCycle 用預設），不報錯
+//  - 只有 1 筆：週期用 defaultCycle（estimated=true 代表用預設值、非實測平均）
+//  - ≥2 筆：avgCycle 用實際間隔平均（四捨五入）
+function cycleStats(startDates, defaultCycle = 30, today = new Date()) {
+  const ds = [...(startDates || [])].map(s => s && String(s).slice(0, 10)).filter(Boolean).sort();
+  if (ds.length === 0) {
+    return { avgCycle: defaultCycle, lastStart: null, predictedNext: null, currentDay: null, estimated: true };
+  }
+  let avgCycle = defaultCycle, estimated = true;
+  if (ds.length >= 2) {
+    let sum = 0, cnt = 0;
+    for (let i = 1; i < ds.length; i++) {
+      const gap = Math.round((parseLocalDate(ds[i]) - parseLocalDate(ds[i - 1])) / 86400000);
+      if (gap > 0) { sum += gap; cnt++; }
+    }
+    if (cnt) { avgCycle = Math.round(sum / cnt); estimated = false; }
+  }
+  const lastStart = ds[ds.length - 1];
+  const next = parseLocalDate(lastStart); next.setDate(next.getDate() + avgCycle);
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const currentDay = Math.floor((t - parseLocalDate(lastStart)) / 86400000) + 1;
+  return { avgCycle, lastStart, predictedNext: formatLocalDate(next), currentDay, estimated };
+}
+
+// 生理期日期集合：每個開始日往後算 periodDays 天，回傳 Set<'YYYY-MM-DD'>
+// 給圖表判斷「哪幾天要標記」用
+function periodDateSet(startDates, periodDays = 7) {
+  const set = new Set();
+  (startDates || []).map(s => s && String(s).slice(0, 10)).filter(Boolean).forEach(s => {
+    const base = parseLocalDate(s);
+    for (let i = 0; i < periodDays; i++) {
+      const d = new Date(base); d.setDate(d.getDate() + i);
+      set.add(formatLocalDate(d));
+    }
+  });
+  return set;
+}
+
+// 把「一串是否落在生理期內」的布林序列，壓成連續色塊 [{from,to}]（用分數索引，±0.5 讓單點也有寬度）
+// flags[i] 對應圖表第 i 個點；相鄰的 true 併成一段
+function periodBands(flags) {
+  const bands = [];
+  let start = -1;
+  for (let i = 0; i <= flags.length; i++) {
+    if (i < flags.length && flags[i]) { if (start < 0) start = i; }
+    else if (start >= 0) { bands.push({ from: start - 0.5, to: (i - 1) + 0.5 }); start = -1; }
+  }
+  return bands;
+}
+
 // 預估達標。currentTrendWeight=目前趨勢體重, targetWeight=目標, kgPerWeek=週趨勢
 // 方向不一致或無趨勢回傳 null；否則回 {weeksToGoal, etaDate:'YYYY-MM-DD'}
 // ETA 一律用 fromDate 的「本地」年/月/日推算日曆天數，不用 toISOString（那是 UTC 日曆天，
@@ -67,6 +123,7 @@ function projectGoal(currentTrendWeight, targetWeight, kgPerWeek, fromDate = new
 const calcApi = {
   KCAL_PER_KG, movingAverage,
   weeklyTrendChange, dailyEnergyBalance, estimateIntake, projectGoal,
+  formatLocalDate, parseLocalDate, cycleStats, periodDateSet, periodBands,
 };
 
 // Node 與瀏覽器環境各自掛載，互不干擾（不使用 var module 保險寫法，避免在瀏覽器洩漏 window.module）
