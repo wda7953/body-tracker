@@ -60,8 +60,10 @@
     <!-- 生理期記錄 -->
     <div class="card">
       <h2 style="font-size:13px;color:#7d8896;margin:0 0 4px;font-weight:600">生理期</h2>
-      <p style="font-size:12px;color:#7d8896;margin:0 0 12px;line-height:1.5">來的那天點一下就好，系統會自動算週期並標在體重圖上。</p>
-      <button class="period" id="periodBtn"><span class="dot"></span>今天生理期來了</button>
+      <p style="font-size:12px;color:#7d8896;margin:0 0 12px;line-height:1.5">來的那天點一下就好。忘了記可以把日期往回改，補登過去某天。</p>
+      <label>開始日期（可往回補登）</label>
+      <input type="date" id="periodDate">
+      <button class="period" id="periodBtn"><span class="dot"></span>記錄生理期開始</button>
       <div class="msg" id="periodMsg"></div>
       <div class="row">
         <div style="flex:1"><label>經期天數</label><input type="number" step="1" id="periodDays" inputmode="numeric" placeholder="7"></div>
@@ -139,14 +141,16 @@
 
     // ── 生理期記錄 ──
     const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+    document.getElementById('periodDate').value = todayStr();   // 預設今天，可往回改補登
     const periodMsg = document.getElementById('periodMsg');
     document.getElementById('periodBtn').addEventListener('click', async () => {
+      const pdate = document.getElementById('periodDate').value || todayStr();
       periodMsg.textContent = '記錄中…'; periodMsg.style.color = '#777';
       try {
-        const r = await API.apiPost('addCycle', { date: todayStr(), client_id: API.genClientId() });
+        const r = await API.apiPost('addCycle', { date: pdate, client_id: API.genClientId() });
         if (r.ok) {
           periodMsg.style.color = '#2E7D32';
-          periodMsg.textContent = r.deduped ? '今天已經記錄過了 ✓' : ('已記錄 ' + todayStr() + ' ✓');
+          periodMsg.textContent = r.deduped ? (pdate + ' 已經記錄過了 ✓') : ('已記錄 ' + pdate + ' ✓');
         } else { periodMsg.textContent = '失敗：' + r.error; periodMsg.style.color = '#C62828'; }
       } catch (err) { periodMsg.textContent = '網路錯誤：' + err.message; periodMsg.style.color = '#C62828'; }
     });
