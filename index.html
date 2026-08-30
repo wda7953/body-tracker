@@ -42,6 +42,13 @@
     .cyc .track .now { position: absolute; top: -3px; width: 2px; height: 14px; background: #fff; border-radius: 2px; }
     .cyc .scale { display: flex; justify-content: space-between; font-size: 10px; color: #7d8896; margin-top: 6px; font-variant-numeric: tabular-nums; }
     .cyc .empty { font-size: 13px; color: #ffbcd0; line-height: 1.5; }
+    .cyc .phase { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 20px; letter-spacing: .02em; }
+    .cyc .phase.menstrual  { color: #ffd0de; background: rgba(255,92,138,.18); }   /* 月經期 洋紅 */
+    .cyc .phase.follicular { color: #bfe6ff; background: rgba(80,170,255,.16); }    /* 濾泡期 藍 */
+    .cyc .phase.ovulation  { color: #d6f5c0; background: rgba(0,230,118,.16); }     /* 排卵期 綠 */
+    .cyc .phase.luteal     { color: #ffe0b0; background: rgba(255,168,60,.16); }    /* 黃體期 橙 */
+    .cyc .phase.late       { color: #ffcaca; background: rgba(255,90,90,.16); }     /* 逾期 紅 */
+    .cyc .phase-note { font-size: 12px; color: #9aa4b2; margin-top: 8px; line-height: 1.4; }
   </style>
 </head>
 <body>
@@ -165,14 +172,17 @@
         const daysUntil = Math.round((Calc.parseLocalDate(cs.predictedNext) - Calc.parseLocalDate(todayLocal)) / 86400000);
         const pct = Math.max(0, Math.min(100, Math.round((cs.currentDay / cs.avgCycle) * 100)));
         const scaleMid = daysUntil > 0 ? `還有 ${daysUntil} 天` : daysUntil === 0 ? '預計今天' : `已延 ${-daysUntil} 天`;
+        const phase = Calc.cyclePhase(cs.currentDay, cs.avgCycle, periodDays);   // 月經期/濾泡期/排卵期/黃體期
         cycleCard = `
         <div class="card cyc">
           <div class="top">
-            <div class="dayn">週期第 ${cs.currentDay} <small>天</small></div>
+            <div><div class="dayn">週期第 ${cs.currentDay} <small>天</small></div>
+              <span class="phase ${phase.key}">${phase.name}</span></div>
             <div class="next"><div class="k">預計下次${cs.estimated ? '（預估）' : ''}</div><div class="v">${md(cs.predictedNext)}</div></div>
           </div>
           <div class="track"><div class="fill" style="width:${pct}%"></div><div class="now" style="left:${pct}%"></div></div>
           <div class="scale"><span>第1天</span><span>${scaleMid}</span><span>${cs.avgCycle}天</span></div>
+          ${phase.note ? `<div class="phase-note">${phase.note}</div>` : ''}
         </div>`;
       } else {
         cycleCard = `

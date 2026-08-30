@@ -76,6 +76,19 @@ function cycleStats(startDates, defaultCycle = 30, today = new Date()) {
   return { avgCycle, lastStart, predictedNext: formatLocalDate(next), currentDay, estimated };
 }
 
+// 依「週期第幾天」判斷所在階段。回傳 { key, name, note }
+//  分期以「黃體期固定約 14 天」回推排卵日（ovDay = avgCycle - 14），再依個人週期縮放：
+//   月經期(1..periodDays) → 濾泡期(..排卵前) → 排卵期(排卵日±1) → 黃體期(排卵後..) → 逾期(>avgCycle)
+function cyclePhase(currentDay, avgCycle = 30, periodDays = 7) {
+  if (currentDay == null || currentDay < 1) return { key: 'unknown', name: '—', note: '' };
+  const ovDay = Math.max(periodDays + 1, Math.round(avgCycle) - 14);   // 排卵日（至少在經期結束後）
+  if (currentDay > Math.round(avgCycle)) return { key: 'late', name: '黃體期（已逾期）', note: '預計日已過，快來了' };
+  if (currentDay <= periodDays)          return { key: 'menstrual', name: '月經期', note: '易水腫，體重上升多為水分' };
+  if (currentDay < ovDay - 1)            return { key: 'follicular', name: '濾泡期', note: '狀態回升，適合安排強度' };
+  if (currentDay <= ovDay + 1)           return { key: 'ovulation', name: '排卵期', note: '體能高點' };
+  return { key: 'luteal', name: '黃體期', note: '易嘴饞、水腫，別被體重嚇到' };
+}
+
 // 生理期日期集合：每個開始日往後算 periodDays 天，回傳 Set<'YYYY-MM-DD'>
 // 給圖表判斷「哪幾天要標記」用
 function periodDateSet(startDates, periodDays = 7) {
@@ -123,7 +136,7 @@ function projectGoal(currentTrendWeight, targetWeight, kgPerWeek, fromDate = new
 const calcApi = {
   KCAL_PER_KG, movingAverage,
   weeklyTrendChange, dailyEnergyBalance, estimateIntake, projectGoal,
-  formatLocalDate, parseLocalDate, cycleStats, periodDateSet, periodBands,
+  formatLocalDate, parseLocalDate, cycleStats, cyclePhase, periodDateSet, periodBands,
 };
 
 // Node 與瀏覽器環境各自掛載，互不干擾（不使用 var module 保險寫法，避免在瀏覽器洩漏 window.module）

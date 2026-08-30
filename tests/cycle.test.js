@@ -59,3 +59,31 @@ test('periodBands: 相鄰 true 併成一段，單點也有寬度', () => {
 test('periodBands: 全 false → 空陣列', () => {
   assert.deepStrictEqual(calc.periodBands([false, false]), []);
 });
+
+test('cyclePhase: 30天週期/7天經期 → 四期邊界正確', () => {
+  // ovDay = 30 - 14 = 16
+  const name = (d) => calc.cyclePhase(d, 30, 7).name;
+  assert.strictEqual(name(1), '月經期');    // 1..7
+  assert.strictEqual(name(7), '月經期');
+  assert.strictEqual(name(8), '濾泡期');    // 8..14（< ovDay-1=15）
+  assert.strictEqual(name(14), '濾泡期');
+  assert.strictEqual(name(15), '排卵期');   // ovDay±1 = 15..17
+  assert.strictEqual(name(17), '排卵期');
+  assert.strictEqual(name(18), '黃體期');   // 18..30
+  assert.strictEqual(name(30), '黃體期');
+});
+
+test('cyclePhase: 超過平均週期 → 黃體期（已逾期）', () => {
+  assert.strictEqual(calc.cyclePhase(31, 30, 7).key, 'late');
+});
+
+test('cyclePhase: currentDay 無效 → unknown，不拋錯', () => {
+  assert.strictEqual(calc.cyclePhase(null, 30, 7).key, 'unknown');
+  assert.strictEqual(calc.cyclePhase(0, 30, 7).key, 'unknown');
+});
+
+test('cyclePhase: 短週期（21天）排卵日不早於經期結束', () => {
+  // ovDay = max(8, 21-14=7) = 8
+  const r = calc.cyclePhase(8, 21, 7);
+  assert.strictEqual(r.name, '排卵期');   // ovDay±1 = 7..9，但第7天仍算月經期，第8天為排卵期
+});
