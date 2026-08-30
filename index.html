@@ -49,6 +49,14 @@
     .cyc .phase.luteal     { color: #ffe0b0; background: rgba(255,168,60,.16); }    /* 黃體期 橙 */
     .cyc .phase.late       { color: #ffcaca; background: rgba(255,90,90,.16); }     /* 逾期 紅 */
     .cyc .phase-note { font-size: 12px; color: #9aa4b2; margin-top: 8px; line-height: 1.4; }
+    .guide { display: flex; flex-direction: column; gap: 8px; }
+    .guide .g { font-size: 13px; color: #cbd5e1; line-height: 1.5; }
+    .guide .g b { display: inline-block; min-width: 4.5em; color: #fff; font-weight: 700; }
+    .guide .g.k b { color: #00e676; }        /* 熱量 */
+    .guide .g.t b { color: #bfe6ff; }        /* 訓練 */
+    .guide .g.a b { color: #ffd0de; }        /* 有氧 */
+    .guide .g.f b { color: #ffe0b0; }        /* 飲食 */
+    .src { font-size: 11px; color: #5f6b7a; margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -165,9 +173,38 @@
 
       const f = (n, d = 1) => (n == null || Number.isNaN(n)) ? '—' : Number(n).toFixed(d);
 
+      // 各期建議（整理自「荷爾蒙週期訓練飲食」筆記 estherxun + 上課用荷爾蒙曲線圖，照原文不腦補）
+      const PHASE_GUIDE = {
+        menstrual: {
+          k: '維持～小赤字（-0～10% TDEE）',
+          t: '全身輕阻力 30–45 分',
+          a: '輕～中度快走 20–30 分',
+          f: '食慾降低、特別想高碳水；恢復減壓為主，可調整運動強度',
+        },
+        follicular: {
+          k: '輕赤字（-10～15% TDEE），最易執行',
+          t: '全身重訓 2–3 次，強度可最高',
+          a: '間歇或坡度走 20–25 分',
+          f: '體力變好、自信增加、體重最輕、睡眠最好、專注力佳，適合高強度／挑戰性工作',
+        },
+        ovulation: {
+          k: '與濾泡期相近或稍高（-8～12%）',
+          t: '維持高品質動作、加強熱身與穩定',
+          a: '維持濾泡期強度',
+          f: '體能高點，維持穩定',
+        },
+        luteal: {
+          k: '維持～微赤字（-0～10%）；經前 2–4 天預留 +100–200 kcal 吃喜歡的',
+          t: '全身阻力 2–3 次、拉長休息、紮實中等次數；睡不好就減少高心率日（肌肉修復較慢）',
+          a: '快走／坡度走為主',
+          f: '易水腫、嘴饞、對身材不滿；代謝增加 89～279kcal 需更多營養。多鎂/鉀/B群/膳食纖維（堅果、深綠菜、香蕉、豆類、黑巧克力、肝臟），蛋白不降、鈉穩定；避免酒精、咖啡因、糖',
+        },
+      };
+      PHASE_GUIDE.late = PHASE_GUIDE.luteal;   // 逾期沿用黃體期建議
+
       // 生理期狀態卡
       const md = (s) => { const p = String(s).slice(0, 10).split('-'); return `${+p[1]}/${+p[2]}`; };
-      let cycleCard;
+      let cycleCard, guideCard = '';
       if (cs.lastStart) {
         const daysUntil = Math.round((Calc.parseLocalDate(cs.predictedNext) - Calc.parseLocalDate(todayLocal)) / 86400000);
         const pct = Math.max(0, Math.min(100, Math.round((cs.currentDay / cs.avgCycle) * 100)));
@@ -184,6 +221,21 @@
           <div class="scale"><span>第1天</span><span>${scaleMid}</span><span>${cs.avgCycle}天</span></div>
           ${phase.note ? `<div class="phase-note">${phase.note}</div>` : ''}
         </div>`;
+        // 本期建議卡（訓練/有氧/熱量/飲食）
+        const g = PHASE_GUIDE[phase.key];
+        if (g) {
+          guideCard = `
+        <div class="card">
+          <h2>本期建議 · ${phase.name}</h2>
+          <div class="guide">
+            <div class="g t"><b>訓練</b>${g.t}</div>
+            <div class="g a"><b>有氧</b>${g.a}</div>
+            <div class="g k"><b>熱量</b>${g.k}</div>
+            <div class="g f"><b>飲食/狀態</b>${g.f}</div>
+          </div>
+          <div class="src">整理自你的「荷爾蒙週期訓練飲食」筆記　·　八二原則，增肌減脂非直線，每 3～6 個月看趨勢</div>
+        </div>`;
+        }
       } else {
         cycleCard = `
         <div class="card cyc">
@@ -197,6 +249,7 @@
       el.innerHTML = `
         <div class="card advice">💡 ${advice}</div>
         ${cycleCard}
+        ${guideCard}
         ${periodNote}
         <div class="card">
           <h2>體重趨勢（原始・7日均線・目標）</h2>
