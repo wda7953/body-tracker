@@ -91,6 +91,7 @@ const DEFAULTS = {
   activeBaselineDays: 14,  // active_kcal 基準取樣天數
   activeMinDays: 10,       // active_kcal 基準至少幾天才啟用
   lutealDays: 7,           // 預測經期前幾天內算黃體期
+  flatBand: 0.1,           // 均線週變化絕對值小於此視為「平穩」（單日跳高不算趨勢上升）
 };
 
 // 字串/空值 → 數字或 null（表格手動編輯可能留下空字串）
@@ -114,9 +115,13 @@ function weightContext(input) {
   const todayW = weights.find(w => w.date === today);
   const todayWeight = todayW ? todayW.value : null;
 
-  // 比昨天：今日之前最近一筆體重
+  // 昨天日曆日字串（供比昨天、訓練發炎共用）
+  const yStr = (() => { const d = Calc.parseLocalDate(today); d.setDate(d.getDate() - 1); return Calc.formatLocalDate(d); })();
+
+  // 比昨天：嚴格取「今日前一天」的體重；漏量則 null，不拿更早的日期冒充昨天
   const priorW = weights.filter(w => w.date < today);
-  const yesterdayWeight = priorW.length ? priorW[priorW.length - 1].value : null;
+  const yWeight = weights.find(w => w.date === yStr);
+  const yesterdayWeight = yWeight ? yWeight.value : null;
   const deltaVsYesterday = (todayWeight != null && yesterdayWeight != null)
     ? +(todayWeight - yesterdayWeight).toFixed(2) : null;
 
@@ -198,7 +203,8 @@ Expected: FAIL（trendRising 目前恆為 null）
   // 均線本身的方向：近 14 個 7 日均線點換算 kg/週，> 0 視為上升
   const ma = Calc.movingAverage(weights, 7);
   const kgPerWeek = Calc.weeklyTrendChange(ma.slice(-14));
-  const trendRising = (kgPerWeek != null) ? kgPerWeek > 0 : null;
+  // 加平穩帶：單日跳高只讓 7 日均線微升（約 spike/7 kg/週），不應被當成趨勢上升
+  const trendRising = (kgPerWeek != null) ? kgPerWeek > o.flatBand : null;
 ```
 並把回傳物件的 `trendRising: null` 改成 `trendRising`。
 
@@ -257,6 +263,18 @@ test('恢復不足型：HRV 偏低 → 命中，detail 含 HRV', () => {
   const daily = [{ date: '2026-08-27', hrv_status: 'LOW' }];
   const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
   assert.match(r.causes.find(x => x.icon === '🌙').detail, /HRV/);
+});
+
+test('恢復不足型：HRV UNBALANCED/POOR → 命中；BALANCED/NONE/空值 → 不因 HRV 命中', () => {
+  const weights = flatThenSpike(0.4);
+  for (const s of ['UNBALANCED', 'POOR']) {
+    const r = ctx.weightContext({ today: '2026-08-27', weights, daily: [{ date: '2026-08-27', hrv_status: s }], cycleStarts: [] });
+    assert.ok(r.causes.find(x => x.icon === '🌙'), s + ' 應命中');
+  }
+  for (const s of ['BALANCED', 'NONE', null, '']) {
+    const r = ctx.weightContext({ today: '2026-08-27', weights, daily: [{ date: '2026-08-27', hrv_status: s }], cycleStarts: [] });
+    assert.strictEqual(r.causes.find(x => x.icon === '🌙'), undefined, String(s) + ' 不應命中');
+  }
 });
 
 test('恢復不足型：RHR 高於基準 +3 → 命中（基準夠天數才算）', () => {
@@ -510,13 +528,17 @@ function percentile(arr, p) {
 
 在生理期計算之後、`const causes = []` 之前，加昨日活動量判斷：
 ```js
-  // 訓練發炎：昨日（日曆昨天）active_kcal 是否落在近14天前 activePercentile 百分位
-  const yStr = (() => { const d = Calc.parseLocalDate(today); d.setDate(d.getDate() - 1); return Calc.formatLocalDate(d); })();
+  // 訓練發炎：昨日（日曆昨天，yStr 已在前面宣告）active_kcal 是否落在近14天前 activePercentile 百分位
   const yesterdayDaily = daily.find(d => String(d.date).slice(0, 10) === yStr) || {};
   const yesterdayActive = num(yesterdayDaily.active_kcal);
-  const activeHist = trailing('active_kcal', o.activeBaselineDays);
+  // 基準排除昨日本身（比較「昨日 vs 昨日之前」），且用嚴格 > 避免全平（值全相等時 p80=該值）誤命中
+  const activeHist = (daily || [])
+    .filter(d => String(d.date).slice(0, 10) < yStr)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .map(d => num(d.active_kcal)).filter(v => v != null)
+    .slice(0, o.activeBaselineDays);
   const activeP = activeHist.length >= o.activeMinDays ? percentile(activeHist, o.activePercentile) : null;
-  const activeHigh = (yesterdayActive != null && activeP != null) && yesterdayActive >= activeP;
+  const activeHigh = (yesterdayActive != null && activeP != null) && yesterdayActive > activeP;
 ```
 
 在 `isUp` 分支內、荷爾蒙那段之後、`verdict = ...` 之前，加：
@@ -590,6 +612,17 @@ test('未上升：均線下降 → 鼓勵語，causes 空', () => {
   const r = ctx.weightContext({ today: '2026-08-27', weights, daily: [], cycleStarts: [] });
   assert.strictEqual(r.causes.length, 0);
   assert.match(r.verdict, /下降|節奏/);
+});
+
+test('未上升：均線平穩（全平）→ 平穩語，causes 空', () => {
+  const weights = wSeries([
+    ['2026-08-20', 55.0], ['2026-08-21', 55.0], ['2026-08-22', 55.0],
+    ['2026-08-23', 55.0], ['2026-08-24', 55.0], ['2026-08-25', 55.0],
+    ['2026-08-26', 55.0], ['2026-08-27', 55.0],
+  ]);
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily: [], cycleStarts: [] });
+  assert.strictEqual(r.causes.length, 0);
+  assert.match(r.verdict, /平穩|照常/);
 });
 ```
 
