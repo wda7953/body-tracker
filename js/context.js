@@ -65,10 +65,44 @@ function weightContext(input) {
   // 加平穩帶：單日跳高只讓 7 日均線微升（約 spike/7 kg/週），不應被當成趨勢上升
   const trendRising = (kgPerWeek != null) ? kgPerWeek > o.flatBand : null;
 
+  // 今日 daily 快照（對應昨晚睡眠、當日 HRV/壓力/電量/RHR）
+  const daily = input.daily || [];
+  const todayDaily = daily.find(d => String(d.date).slice(0, 10) === today) || {};
+  const hrvStatus = todayDaily.hrv_status || null;
+  const sleep = num(todayDaily.sleep_score);
+  const stress = num(todayDaily.avg_stress);
+  const battery = num(todayDaily.body_battery);
+  const rhr = num(todayDaily.resting_hr);
+
+  // 取今日之前最近 n 筆某欄位有效值（由新到舊）
+  const trailing = (key, n) => (daily || [])
+    .filter(d => String(d.date).slice(0, 10) < today)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .map(d => num(d[key]))
+    .filter(v => v != null)
+    .slice(0, n);
+
+  const rhrTrail = trailing('resting_hr', o.rhrBaselineDays);
+  const rhrBase = rhrTrail.length >= o.rhrMinDays ? mean(rhrTrail) : null;
+
   const causes = [];
   let verdict;
+  const isUp = deltaVsTrend != null && deltaVsTrend > o.trendThreshold;
+
   if (deltaVsTrend == null) {
     verdict = '資料累積中，多記幾天體重就能判斷。';
+  } else if (isUp) {
+    // 🌙 恢復不足型水腫
+    const rec = [];
+    const HRV_ZH = { LOW: '偏低', UNBALANCED: '失衡', POOR: '差' };
+    if (hrvStatus && HRV_ZH[hrvStatus]) rec.push('HRV' + HRV_ZH[hrvStatus]);
+    if (rhr != null && rhrBase != null && rhr > rhrBase + o.rhrDelta) rec.push('靜息心率偏高');
+    if (sleep != null && sleep < o.sleepLow) rec.push('睡眠分' + Math.round(sleep));
+    if (stress != null && stress > o.stressHigh) rec.push('壓力' + Math.round(stress));
+    if (battery != null && battery < o.batteryLow) rec.push('電量' + Math.round(battery));
+    if (rec.length) causes.push({ icon: '🌙', label: '恢復不足型水腫', detail: rec.join('、') + ' → 儲水' });
+
+    verdict = causes.length ? '多半是水不是脂肪，維持節奏，3–5 天後再看均線。' : '數據平穩，照常執行。';
   } else {
     verdict = '數據平穩，照常執行。';
   }

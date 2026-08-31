@@ -40,3 +40,62 @@ test('trendRising：均線往上時為 true、往下時為 false', () => {
   ]);
   assert.strictEqual(ctx.weightContext({ today: '2026-08-27', weights: down, daily: [], cycleStarts: [] }).trendRising, false);
 });
+
+// 造 8 天「平的」體重，讓今日剛好高於均線 spike（進入成因判斷）
+function flatThenSpike(spike) {
+  return wSeries([
+    ['2026-08-20', 55.0], ['2026-08-21', 55.0], ['2026-08-22', 55.0],
+    ['2026-08-23', 55.0], ['2026-08-24', 55.0], ['2026-08-25', 55.0],
+    ['2026-08-26', 55.0], ['2026-08-27', 55.0 + spike],
+  ]);
+}
+// 造 6 天 RHR 基準都 50 的 daily（不含今日）
+function rhrBaselineDaily(rhr) {
+  return ['2026-08-21','2026-08-22','2026-08-23','2026-08-24','2026-08-25','2026-08-26']
+    .map(date => ({ date, resting_hr: rhr }));
+}
+
+test('恢復不足型：睡眠分低 → 命中 🌙，detail 含睡眠分', () => {
+  const weights = flatThenSpike(0.4);
+  const daily = [{ date: '2026-08-27', sleep_score: 52 }];
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  const c = r.causes.find(x => x.icon === '🌙');
+  assert.ok(c, '應命中恢復不足型');
+  assert.match(c.detail, /睡眠分52/);
+});
+
+test('恢復不足型：HRV 偏低 → 命中，detail 含 HRV', () => {
+  const weights = flatThenSpike(0.4);
+  const daily = [{ date: '2026-08-27', hrv_status: 'LOW' }];
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  assert.match(r.causes.find(x => x.icon === '🌙').detail, /HRV/);
+});
+
+test('恢復不足型：HRV UNBALANCED/POOR → 命中；BALANCED/NONE/空值 → 不因 HRV 命中', () => {
+  const weights = flatThenSpike(0.4);
+  for (const s of ['UNBALANCED', 'POOR']) {
+    const r = ctx.weightContext({ today: '2026-08-27', weights, daily: [{ date: '2026-08-27', hrv_status: s }], cycleStarts: [] });
+    assert.ok(r.causes.find(x => x.icon === '🌙'), s + ' 應命中');
+  }
+  for (const s of ['BALANCED', 'NONE', null, '']) {
+    const r = ctx.weightContext({ today: '2026-08-27', weights, daily: [{ date: '2026-08-27', hrv_status: s }], cycleStarts: [] });
+    assert.strictEqual(r.causes.find(x => x.icon === '🌙'), undefined, String(s) + ' 不應命中');
+  }
+});
+
+test('恢復不足型：RHR 高於基準 +3 → 命中（基準夠天數才算）', () => {
+  const weights = flatThenSpike(0.4);
+  const daily = [...rhrBaselineDaily(50), { date: '2026-08-27', resting_hr: 55 }];
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  assert.match(r.causes.find(x => x.icon === '🌙').detail, /靜息心率/);
+});
+
+test('恢復不足型：RHR 基準天數不足（<5）→ 不因 RHR 命中', () => {
+  const weights = flatThenSpike(0.4);
+  const daily = [
+    { date: '2026-08-25', resting_hr: 50 }, { date: '2026-08-26', resting_hr: 50 },
+    { date: '2026-08-27', resting_hr: 60 },  // 只有 2 天基準
+  ];
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  assert.strictEqual(r.causes.find(x => x.icon === '🌙'), undefined);
+});
