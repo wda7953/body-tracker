@@ -211,3 +211,30 @@ test('未上升：均線平穩（全平）→ 平穩語，causes 空', () => {
   assert.strictEqual(r.causes.length, 0);
   assert.match(r.verdict, /平穩|照常/);
 });
+
+test('多重成因：生理期 + 沒睡飽 同時命中，兩個都列出', () => {
+  const weights = flatThenSpike(0.4);
+  const daily = [{ date: '2026-08-27', sleep_score: 52 }];
+  const r = ctx.weightContext({
+    today: '2026-08-27', weights, daily, cycleStarts: ['2026-08-25'],
+  });
+  assert.ok(r.causes.find(x => x.icon === '🌙'), '應有恢復不足');
+  assert.ok(r.causes.find(x => x.icon === '🩸'), '應有荷爾蒙');
+  assert.strictEqual(r.causes.length, 2);
+  assert.match(r.verdict, /疊在一起/);
+});
+
+test('邊界：剛好高於均線 +0.2（非嚴格大於）→ 不進入成因判斷', () => {
+  const weights = flatThenSpike(0.2);   // 55.2 - 55.0 = 0.2，等於門檻
+  const daily = [{ date: '2026-08-27', sleep_score: 40 }];
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  assert.strictEqual(r.deltaVsTrend, 0.2);
+  assert.strictEqual(r.causes.find(x => x.icon === '🌙'), undefined);  // 未超過門檻，不判成因
+});
+
+test('邊界：高於均線 +0.21（超過門檻）→ 進入成因判斷', () => {
+  const weights = flatThenSpike(0.21);
+  const daily = [{ date: '2026-08-27', sleep_score: 40 }];
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  assert.ok(r.causes.find(x => x.icon === '🌙'));
+});
