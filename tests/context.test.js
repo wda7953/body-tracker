@@ -167,3 +167,47 @@ test('訓練發炎型：基準天數不足（<10）→ 不命中', () => {
   const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
   assert.strictEqual(r.causes.find(x => x.icon === '💪'), undefined);
 });
+
+test('可能真胖：上升且均線也上升、無恢復問題 → 📈', () => {
+  // 一路緩升，今日再高於前7均線 > 0.2；daily 全正常
+  const weights = wSeries([
+    ['2026-08-20', 54.4], ['2026-08-21', 54.5], ['2026-08-22', 54.6],
+    ['2026-08-23', 54.7], ['2026-08-24', 54.8], ['2026-08-25', 54.9],
+    ['2026-08-26', 55.0], ['2026-08-27', 55.4],
+  ]);
+  const daily = [{ date: '2026-08-27', sleep_score: 85, avg_stress: 25, body_battery: 80, hrv_status: 'BALANCED' }];
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  assert.ok(r.causes.find(x => x.icon === '📈'));
+  assert.match(r.verdict, /攝食/);
+});
+
+test('正常波動：上升但均線沒上升、無恢復問題 → ✅ 鎖水', () => {
+  const weights = flatThenSpike(0.4);   // 前面全平、今日一次跳高 → 均線幾乎不動
+  const daily = [{ date: '2026-08-27', sleep_score: 85, avg_stress: 25, body_battery: 80, hrv_status: 'BALANCED' }];
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  const c = r.causes.find(x => x.icon === '✅');
+  assert.ok(c);
+  assert.match(r.verdict, /鎖水|水/);
+});
+
+test('未上升：均線下降 → 鼓勵語，causes 空', () => {
+  const weights = wSeries([
+    ['2026-08-20', 56.0], ['2026-08-21', 55.8], ['2026-08-22', 55.6],
+    ['2026-08-23', 55.4], ['2026-08-24', 55.2], ['2026-08-25', 55.0],
+    ['2026-08-26', 54.8], ['2026-08-27', 54.6],
+  ]);
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily: [], cycleStarts: [] });
+  assert.strictEqual(r.causes.length, 0);
+  assert.match(r.verdict, /下降|節奏/);
+});
+
+test('未上升：均線平穩（全平）→ 平穩語，causes 空', () => {
+  const weights = wSeries([
+    ['2026-08-20', 55.0], ['2026-08-21', 55.0], ['2026-08-22', 55.0],
+    ['2026-08-23', 55.0], ['2026-08-24', 55.0], ['2026-08-25', 55.0],
+    ['2026-08-26', 55.0], ['2026-08-27', 55.0],
+  ]);
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily: [], cycleStarts: [] });
+  assert.strictEqual(r.causes.length, 0);
+  assert.match(r.verdict, /平穩|照常/);
+});

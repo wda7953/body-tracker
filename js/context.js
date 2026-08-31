@@ -148,9 +148,21 @@ function weightContext(input) {
       causes.push({ icon: '💪', label: '訓練發炎型', detail: '昨天活動量偏高 → 肌肉修復儲水' });
     }
 
-    verdict = causes.length ? '多半是水不是脂肪，維持節奏，3–5 天後再看均線。' : '數據平穩，照常執行。';
+    if (causes.length) {
+      verdict = causes.length >= 2
+        ? '幾個因素疊在一起推高，多半是水不是脂肪，維持節奏，3–5 天後再看均線。'
+        : '多半是水不是脂肪，維持節奏，3–5 天後再看均線。';
+    } else if (trendRising) {
+      causes.push({ icon: '📈', label: '可能真的變胖', detail: '恢復訊號正常，但 7 日均線也在上升' });
+      verdict = '均線也在上升，留意近期攝食。';
+    } else {
+      causes.push({ icon: '✅', label: '正常波動', detail: '恢復訊號正常、均線沒上升，純鎖水' });
+      verdict = '免緊張，鎖水而已。';
+    }
   } else {
-    verdict = '數據平穩，照常執行。';
+    verdict = (kgPerWeek != null && kgPerWeek < 0)
+      ? '均線下降中、恢復良好，節奏很好。'
+      : '數據平穩，照常執行。';
   }
 
   return { deltaVsYesterday, deltaVsTrend, trendRising, causes, verdict };
