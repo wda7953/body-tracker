@@ -99,3 +99,31 @@ test('恢復不足型：RHR 基準天數不足（<5）→ 不因 RHR 命中', ()
   const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
   assert.strictEqual(r.causes.find(x => x.icon === '🌙'), undefined);
 });
+
+test('荷爾蒙型：今日在經期內 → 命中 🩸 生理期中', () => {
+  const weights = flatThenSpike(0.4);
+  // 8/25 開始的經期，periodDays 預設 7 → 8/27 仍在期內
+  const r = ctx.weightContext({
+    today: '2026-08-27', weights, daily: [], cycleStarts: ['2026-08-25'],
+  });
+  const c = r.causes.find(x => x.icon === '🩸');
+  assert.ok(c);
+  assert.match(c.detail, /生理期中/);
+});
+
+test('荷爾蒙型：今日在預測經期前7天內（黃體期）→ 命中 🩸 黃體期', () => {
+  const weights = flatThenSpike(0.4);
+  // 上次 7/30 開始，週期 30 天 → 預測下次約 8/29；8/27 距 2 天 → 黃體期
+  const r = ctx.weightContext({
+    today: '2026-08-27', weights, daily: [], cycleStarts: ['2026-06-30', '2026-07-30'], cycleDays: 30,
+  });
+  const c = r.causes.find(x => x.icon === '🩸');
+  assert.ok(c);
+  assert.match(c.detail, /黃體期/);
+});
+
+test('荷爾蒙型：無生理期資料 → 不命中 🩸', () => {
+  const weights = flatThenSpike(0.4);
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily: [], cycleStarts: [] });
+  assert.strictEqual(r.causes.find(x => x.icon === '🩸'), undefined);
+});

@@ -85,6 +85,18 @@ function weightContext(input) {
   const rhrTrail = trailing('resting_hr', o.rhrBaselineDays);
   const rhrBase = rhrTrail.length >= o.rhrMinDays ? mean(rhrTrail) : null;
 
+  // 生理期狀態
+  const cycleStarts = (input.cycleStarts || []).map(s => String(s).slice(0, 10)).filter(Boolean);
+  const periodDays = input.periodDays || 7;
+  const cs = Calc.cycleStats(cycleStarts, input.cycleDays || 30, Calc.parseLocalDate(today));
+  const periodSet = Calc.periodDateSet(cycleStarts, periodDays);
+  const inPeriodToday = periodSet.has(today);
+  const daysUntilNext = cs.predictedNext
+    ? Math.round((Calc.parseLocalDate(cs.predictedNext) - Calc.parseLocalDate(today)) / 86400000)
+    : null;
+  const isLuteal = !inPeriodToday && daysUntilNext != null
+    && daysUntilNext > 0 && daysUntilNext <= o.lutealDays;
+
   const causes = [];
   let verdict;
   const isUp = deltaVsTrend != null && deltaVsTrend > o.trendThreshold;
@@ -101,6 +113,13 @@ function weightContext(input) {
     if (stress != null && stress > o.stressHigh) rec.push('壓力' + Math.round(stress));
     if (battery != null && battery < o.batteryLow) rec.push('電量' + Math.round(battery));
     if (rec.length) causes.push({ icon: '🌙', label: '恢復不足型水腫', detail: rec.join('、') + ' → 儲水' });
+
+    // 🩸 荷爾蒙型水腫
+    if (inPeriodToday) {
+      causes.push({ icon: '🩸', label: '荷爾蒙型水腫', detail: '生理期中 → 荷爾蒙自然儲水' });
+    } else if (isLuteal) {
+      causes.push({ icon: '🩸', label: '荷爾蒙型水腫', detail: `黃體期（預計 ${daysUntilNext} 天後來）→ 經前儲水` });
+    }
 
     verdict = causes.length ? '多半是水不是脂肪，維持節奏，3–5 天後再看均線。' : '數據平穩，照常執行。';
   } else {
