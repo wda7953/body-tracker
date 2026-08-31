@@ -23,3 +23,20 @@ test('資料不足（前<3天）→ deltaVsTrend null、verdict 為累積中', (
   assert.strictEqual(r.deltaVsTrend, null);
   assert.match(r.verdict, /資料累積中/);
 });
+
+test('trendRising：均線往上時為 true、往下時為 false', () => {
+  // 8 天一路上升 → 近14均線點斜率為正
+  const up = wSeries([
+    ['2026-08-20', 54.0], ['2026-08-21', 54.2], ['2026-08-22', 54.4],
+    ['2026-08-23', 54.6], ['2026-08-24', 54.8], ['2026-08-25', 55.0],
+    ['2026-08-26', 55.2], ['2026-08-27', 55.4],
+  ]);
+  assert.strictEqual(ctx.weightContext({ today: '2026-08-27', weights: up, daily: [], cycleStarts: [] }).trendRising, true);
+
+  const down = wSeries([
+    ['2026-08-20', 56.0], ['2026-08-21', 55.8], ['2026-08-22', 55.6],
+    ['2026-08-23', 55.4], ['2026-08-24', 55.2], ['2026-08-25', 55.0],
+    ['2026-08-26', 54.8], ['2026-08-27', 54.6],
+  ]);
+  assert.strictEqual(ctx.weightContext({ today: '2026-08-27', weights: down, daily: [], cycleStarts: [] }).trendRising, false);
+});

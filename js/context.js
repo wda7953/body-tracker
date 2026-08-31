@@ -59,6 +59,12 @@ function weightContext(input) {
   const deltaVsTrend = (todayWeight != null && trendBaseline != null)
     ? +(todayWeight - trendBaseline).toFixed(2) : null;
 
+  // 均線本身的方向：近 14 個 7 日均線點換算 kg/週，> 0 視為上升
+  const ma = Calc.movingAverage(weights, 7);
+  const kgPerWeek = Calc.weeklyTrendChange(ma.slice(-14));
+  // 加平穩帶：單日跳高只讓 7 日均線微升（約 spike/7 kg/週），不應被當成趨勢上升
+  const trendRising = (kgPerWeek != null) ? kgPerWeek > o.flatBand : null;
+
   const causes = [];
   let verdict;
   if (deltaVsTrend == null) {
@@ -67,7 +73,7 @@ function weightContext(input) {
     verdict = '數據平穩，照常執行。';
   }
 
-  return { deltaVsYesterday, deltaVsTrend, trendRising: null, causes, verdict };
+  return { deltaVsYesterday, deltaVsTrend, trendRising, causes, verdict };
 }
 
 // 變數名加前綴避免瀏覽器多個 <script> 共用全域作用域時撞名
