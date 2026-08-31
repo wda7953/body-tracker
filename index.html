@@ -18,6 +18,12 @@
     .content { padding: 16px; }
     .card { background: #161b22; border: 1px solid #232c38; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
     .advice { background: #12251b; border: 1px solid #1e5b3c; border-left: 4px solid #00e676; color: #b6f5d0; font-size: 14px; line-height: 1.5; }
+    /* 今日體重情境卡 */
+    .wctx .deltas { display: flex; gap: 16px; font-size: 13px; color: #9aa4b2; margin-bottom: 10px; font-variant-numeric: tabular-nums; }
+    .wctx .deltas b { color: #fff; font-weight: 700; }
+    .wctx .cause { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; line-height: 1.5; margin: 6px 0; color: #e6edf3; }
+    .wctx .cause .ic { font-size: 16px; flex: 0 0 auto; }
+    .wctx .verdict { font-size: 13px; color: #b6c2d0; line-height: 1.5; margin-top: 10px; padding-top: 10px; border-top: 1px solid #232c38; }
     .row { display: flex; gap: 12px; }
     .row .card { flex: 1; text-align: center; }
     .stat .label { font-size: 12px; color: #7d8896; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
@@ -68,6 +74,7 @@
     <a href="photos.html">照片</a>
   </nav>
   <script src="js/calc.js"></script>
+  <script src="js/context.js"></script>
   <script src="js/advice.js"></script>
   <script src="js/chart.js"></script>
   <script src="js/api.js"></script>
@@ -126,6 +133,26 @@
       const sleepScore = avg(recent3, 'sleep_score'), avgStress = avg(recent3, 'avg_stress'), bodyBattery = avg(recent3, 'body_battery');
       const weightStalled = kgPerWeek != null && Math.abs(kgPerWeek) < 0.1;
       const advice = Advice.dailyAdvice({ sleepScore, avgStress, bodyBattery, weightKgPerWeek: kgPerWeek, weightStalled });
+
+      // 今日體重情境：把成因判斷所需資料組給 Context.weightContext
+      const wctx = Context.weightContext({
+        today: todayLocal,
+        weights,                 // 已過濾為 [{date, value}]
+        daily: dailyAsc,         // 含 resting_hr/hrv_status/sleep_score/avg_stress/body_battery/active_kcal
+        cycleStarts,             // 生理期開始日字串陣列
+        periodDays, cycleDays,
+      });
+      const fmtDelta = (v) => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(1) + 'kg';
+      const causeRows = wctx.causes.map(c =>
+        `<div class="cause"><span class="ic">${c.icon}</span><span>${c.label}（${c.detail}）</span></div>`
+      ).join('');
+      const wctxCard = `
+        <div class="card wctx">
+          <h2>今日體重情境</h2>
+          <div class="deltas"><span>比昨天 <b>${fmtDelta(wctx.deltaVsYesterday)}</b></span><span>比7日均線 <b>${fmtDelta(wctx.deltaVsTrend)}</b></span></div>
+          ${causeRows}
+          <div class="verdict">→ ${wctx.verdict}</div>
+        </div>`;
 
       // 今日訓練準備：取最新一天的 Garmin 數據（這是「今天該訓練還是休息」的即時快照，非平均）
       const latestDaily = dailyAsc.length ? dailyAsc[dailyAsc.length - 1] : {};
@@ -248,6 +275,7 @@
 
       el.innerHTML = `
         <div class="card advice">💡 ${advice}</div>
+        ${wctxCard}
         ${cycleCard}
         ${guideCard}
         ${periodNote}
