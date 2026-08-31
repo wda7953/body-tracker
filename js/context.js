@@ -30,6 +30,16 @@ function num(v) {
 }
 function mean(arr) { return (arr && arr.length) ? arr.reduce((s, v) => s + v, 0) / arr.length : null; }
 
+// 百分位（線性插值），p 為 0..100。空陣列回 null。
+function percentile(arr, p) {
+  const a = (arr || []).filter(v => v != null).slice().sort((x, y) => x - y);
+  if (!a.length) return null;
+  if (a.length === 1) return a[0];
+  const idx = (p / 100) * (a.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  return (lo === hi) ? a[lo] : a[lo] + (a[hi] - a[lo]) * (idx - lo);
+}
+
 function weightContext(input) {
   input = input || {};
   const o = Object.assign({}, DEFAULTS, input.opts || {});
@@ -97,6 +107,18 @@ function weightContext(input) {
   const isLuteal = !inPeriodToday && daysUntilNext != null
     && daysUntilNext > 0 && daysUntilNext <= o.lutealDays;
 
+  // 訓練發炎：昨日（日曆昨天，yStr 已在前面宣告）active_kcal 是否落在近14天前 activePercentile 百分位
+  const yesterdayDaily = daily.find(d => String(d.date).slice(0, 10) === yStr) || {};
+  const yesterdayActive = num(yesterdayDaily.active_kcal);
+  // 基準排除昨日本身（比較「昨日 vs 昨日之前」），且用嚴格 > 避免全平（值全相等時 p80=該值）誤命中
+  const activeHist = (daily || [])
+    .filter(d => String(d.date).slice(0, 10) < yStr)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))
+    .map(d => num(d.active_kcal)).filter(v => v != null)
+    .slice(0, o.activeBaselineDays);
+  const activeP = activeHist.length >= o.activeMinDays ? percentile(activeHist, o.activePercentile) : null;
+  const activeHigh = (yesterdayActive != null && activeP != null) && yesterdayActive > activeP;
+
   const causes = [];
   let verdict;
   const isUp = deltaVsTrend != null && deltaVsTrend > o.trendThreshold;
@@ -121,6 +143,11 @@ function weightContext(input) {
       causes.push({ icon: '🩸', label: '荷爾蒙型水腫', detail: `黃體期（預計 ${daysUntilNext} 天後來）→ 經前儲水` });
     }
 
+    // 💪 訓練發炎型
+    if (activeHigh) {
+      causes.push({ icon: '💪', label: '訓練發炎型', detail: '昨天活動量偏高 → 肌肉修復儲水' });
+    }
+
     verdict = causes.length ? '多半是水不是脂肪，維持節奏，3–5 天後再看均線。' : '數據平穩，照常執行。';
   } else {
     verdict = '數據平穩，照常執行。';
@@ -130,6 +157,6 @@ function weightContext(input) {
 }
 
 // 變數名加前綴避免瀏覽器多個 <script> 共用全域作用域時撞名
-const contextApi = { weightContext, DEFAULTS };
+const contextApi = { weightContext, percentile, DEFAULTS };
 if (typeof module !== 'undefined') { module.exports = contextApi; }
 if (typeof window !== 'undefined') { window.Context = contextApi; }

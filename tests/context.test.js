@@ -127,3 +127,43 @@ test('荷爾蒙型：無生理期資料 → 不命中 🩸', () => {
   const r = ctx.weightContext({ today: '2026-08-27', weights, daily: [], cycleStarts: [] });
   assert.strictEqual(r.causes.find(x => x.icon === '🩸'), undefined);
 });
+
+test('percentile：線性插值，p80 正確', () => {
+  const a = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+  assert.strictEqual(ctx.percentile(a, 80), 82);   // 0.8*(10-1)=7.2 → 80+0.2*(90-80)
+  assert.strictEqual(ctx.percentile([], 80), null);
+  assert.strictEqual(ctx.percentile([42], 80), 42);
+});
+
+// 造 10 天 active_kcal 基準（不含今日與昨日）都在 300，昨日給高值
+function activeBaselineDaily(base, yesterdayVal) {
+  const days = ['2026-08-16','2026-08-17','2026-08-18','2026-08-19','2026-08-20',
+                '2026-08-21','2026-08-22','2026-08-23','2026-08-24','2026-08-25'];
+  const rows = days.map(date => ({ date, active_kcal: base }));
+  rows.push({ date: '2026-08-26', active_kcal: yesterdayVal });  // 昨日
+  return rows;
+}
+
+test('訓練發炎型：昨日 active_kcal 落在前20% → 命中 💪', () => {
+  const weights = flatThenSpike(0.4);
+  const daily = activeBaselineDaily(300, 900);   // 昨日 900 遠高於前20%
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  assert.ok(r.causes.find(x => x.icon === '💪'));
+});
+
+test('訓練發炎型：昨日 active_kcal 平平 → 不命中', () => {
+  const weights = flatThenSpike(0.4);
+  const daily = activeBaselineDaily(300, 300);
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  assert.strictEqual(r.causes.find(x => x.icon === '💪'), undefined);
+});
+
+test('訓練發炎型：基準天數不足（<10）→ 不命中', () => {
+  const weights = flatThenSpike(0.4);
+  const daily = [
+    { date: '2026-08-24', active_kcal: 300 }, { date: '2026-08-25', active_kcal: 300 },
+    { date: '2026-08-26', active_kcal: 900 },  // 昨日高，但基準只有 3 天
+  ];
+  const r = ctx.weightContext({ today: '2026-08-27', weights, daily, cycleStarts: [] });
+  assert.strictEqual(r.causes.find(x => x.icon === '💪'), undefined);
+});
