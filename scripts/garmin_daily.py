@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from garmin_login import make_client
 
 def taipei_yesterday():
-    tw = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+    tw = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)
     return (tw.date() - datetime.timedelta(days=1)).isoformat()
 
 # API 端的設定（非 Garmin 帳密）：有環境變數就用，否則終端機互動輸入
