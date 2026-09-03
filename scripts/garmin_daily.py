@@ -23,6 +23,22 @@ def dig(d, *path, default=None):
         if d is None: return default
     return d
 
+def persist_token(g):
+    # 把本次登入/刷新後的「最新 token」寫到 TOKEN_OUT 檔，供 workflow 回寫 GitHub Secret。
+    # 為什麼一定要做：garminconnect(DI token) 每次刷新會輪替 refresh token 並作廢舊的；
+    # 若只把原始 token 放 Secret、刷新後不存回，隔天雲端拿舊的必 401（本系統「不會壞」的關鍵）。
+    # 為什麼在「撈完 Garmin 就寫」而非等後端 POST 成功：就算後端一時失敗，token 已被輪替，
+    # 不存回就等於丟掉唯一有效的新 token（codex 交叉驗證建議）。
+    out = os.environ.get('TOKEN_OUT')
+    if not out:
+        return
+    try:
+        with open(out, 'w') as f:
+            f.write(g.client.dumps())
+        print(f'已輸出刷新後 token → {out}（供 workflow 回寫 Secret）')
+    except Exception as e:
+        print('輸出刷新 token 失敗（不影響本次資料）：', e, file=sys.stderr)
+
 def main():
     api_url = cred('API_URL', 'Apps Script exec 網址: ')
     token = cred('API_TOKEN', 'API token: ')
@@ -61,6 +77,9 @@ def main():
         hrv_status = summ.get('status')
     except Exception:
         pass
+
+    # Garmin 端已全部撈完，g 內部持有本次刷新後的最新 token → 立刻存回（不等後端 POST）
+    persist_token(g)
 
     payload = {
         'date': date,

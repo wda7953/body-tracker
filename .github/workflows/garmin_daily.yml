@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '0 22 * * *'   # UTC 22:00 = 台灣隔日 06:00
   workflow_dispatch: {}
+
+# 同時只跑一個（且不取消進行中）：避免排程與手動重跑同時刷新同一 token 互相踢掉
+concurrency:
+  group: garmin-daily
+  cancel-in-progress: false
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -16,10 +22,34 @@ jobs:
         env:
           # 雲端不能輸驗證碼，改用本機產生的 token（GARMINTOKENS secret＝garmin_login.py 印出的 JSON）
           GARMINTOKENS: ${{ secrets.GARMINTOKENS }}
+          # 撈完把刷新後的最新 token 寫到這個檔，下一步回寫 Secret（token 天天保鮮，不會隔天失效）
+          TOKEN_OUT: fresh_token.json
           # API_URL 非機密（後端網址，沒密碼也沒用）；API_TOKEN 是密碼，改讀 GitHub Secret，不再明文
           API_URL: 'https://script.google.com/macros/s/AKfycbw2xAshmV1x9tzj2dgR2XKPyX2dHgH1TU6NnLLmYfuP6ffVQwr77MQ77s7LjTHr9WytQA/exec'
           API_TOKEN: ${{ secrets.BODY_API_TOKEN }}
         run: python scripts/garmin_daily.py
+      - name: 回寫刷新後 token 到 Secret（保持雲端 token 常新）
+        # always()：只要有撈到（fresh_token.json 存在）就回寫，連後端 POST 一時失敗也照存，
+        # 因為 Garmin 的 refresh token 已輪替，這是唯一有效的新 token，丟了明天就 401
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: |
+          if [ ! -s fresh_token.json ]; then
+            echo "沒有 fresh_token.json（登入可能就失敗了），略過回寫"; exit 0
+          fi
+          # 不要把 token 內容印到 log；gh 從 stdin 讀值，--repo 明確指定本 repo
+          if gh secret set GARMINTOKENS --repo "$GITHUB_REPOSITORY" < fresh_token.json; then
+            echo "GARMINTOKENS 已更新為最新 token"
+          else
+            echo "回寫 Secret 失敗" >&2
+            curl -s -X POST https://api.line.me/v2/bot/message/push \
+              -H "Authorization: Bearer $LINE_CHANNEL_ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"to":"'"$LINE_USER_ID"'","messages":[{"type":"text","text":"⚠️ Body tracker：今天有撈到資料，但 Garmin token 回寫 GitHub Secret 失敗（多半是 GH_PAT 過期或權限不足）。請找 AI 分身檢查 GH_PAT，否則明天可能會斷。"}]}'
+          fi
       - name: 失敗通知（LINE push）
         if: failure()
         # 雲端沒有 macOS Keychain，改用 GitHub Secrets + LINE Messaging API push（同 email-summary repo 慣例）
