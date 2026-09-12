@@ -86,6 +86,8 @@
       try { res = await API.apiGet('getAll'); } catch (e) { el.innerHTML = '<div class="card">載入失敗：' + e.message + '</div>'; return; }
       if (!res.ok) { el.innerHTML = '<div class="card">錯誤：' + res.error + '</div>'; return; }
       const { daily, body, cycle, settings } = res.data;
+      // 數字格式化小工具：null/NaN → '—'，否則四捨五入到 d 位（須定義在所有使用點之前，避免 const TDZ）
+      const f = (n, d = 1) => (n == null || Number.isNaN(n)) ? '—' : Number(n).toFixed(d);
       const setMap = {}; (settings || []).forEach(s => setMap[s.key] = s.value);
       const targetWeightRaw = setMap.target_weight ? parseFloat(setMap.target_weight) : null;
       const targetWeight = Number.isNaN(targetWeightRaw) ? null : targetWeightRaw;
@@ -197,8 +199,6 @@
         targetY: targetWeight,
         bands: periodBandList,   // 生理期那幾天的淡洋紅背景
       });
-
-      const f = (n, d = 1) => (n == null || Number.isNaN(n)) ? '—' : Number(n).toFixed(d);
 
       // 各期建議（整理自「荷爾蒙週期訓練飲食」筆記 estherxun + 上課用荷爾蒙曲線圖，照原文不腦補）
       const PHASE_GUIDE = {
