@@ -58,16 +58,8 @@ def main():
     except Exception:
         bb_high = None
 
-    # 訓練準備度（0-100，Garmin 綜合 HRV/睡眠/恢復/負荷算出的「今天適合訓練還是休息」）
-    # 這些是較新的 Garmin 功能，套件版本或手錶型號不支援就給 None，不讓整個腳本崩
-    training_readiness = None
-    try:
-        tr = g.get_training_readiness(date)
-        if isinstance(tr, list) and tr: tr = tr[0]
-        if isinstance(tr, dict): training_readiness = tr.get('score')
-    except Exception:
-        training_readiness = None
-
+    # 註：不撈 Training Readiness——olan 的錶是 Venu 3S，該功能只有 Forerunner/fēnix 才有，
+    # 撈到永遠是 None（見記憶 feedback-verify-datasource-support）。訓練準備改用 HRV/睡眠/壓力/身體電量在前端判斷。
     hrv_last_night = None
     hrv_status = None
     try:
@@ -92,7 +84,6 @@ def main():
         'sleep_score': dig(sleep, 'dailySleepDTO', 'sleepScores', 'overall', 'value'),
         'sleep_hours': round(sleep_secs / 3600, 2),
         'body_battery': bb_high,
-        'training_readiness': training_readiness,
         'hrv_last_night': hrv_last_night,
         'hrv_status': hrv_status,
     }
