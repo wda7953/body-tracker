@@ -25,7 +25,9 @@ function isExpired() {
   } catch (e) { return true; }
 }
 
-const REQUEST_TIMEOUT_MS = 12000;  // 後端(Apps Script)偶發卡住時的逾時上限，超過就 reject 讓畫面能顯示錯誤+重試
+// 逾時上限：Apps Script 閒置後「冷啟動」首次喚醒實測約 18 秒，設 12 秒會讓每次隔一陣子開 App 的第一發
+// 必逾時→假性「連線逾時」。拉到 30 秒蓋過冷啟動且留餘裕；真的後端掛掉才會等到這個上限才報錯+重試。
+const REQUEST_TIMEOUT_MS = 30000;
 
 // 帶逾時的 fetch：後端一直不回應時不再永遠 hang（畫面卡在「載入中…」的根因）
 async function fetchWithTimeout(url, opts = {}, ms = REQUEST_TIMEOUT_MS) {
