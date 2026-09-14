@@ -135,6 +135,27 @@ function addCycle(data) {
   } finally { lock.releaseLock(); }
 }
 
+// 一次性工具：把 cycle 表裡 client_id 以 'test-' 開頭的（早期種子/測試標記）改成正式 id。
+// 日期資料本身有效（8/23 是真實經期開始日），只是把「test-」標記正規化，避免看起來像測試資料。
+// 用法：在 Apps Script 編輯器選這個函式 → 執行一次即可（不需重新部署）。
+function normalizeCycleTestIds() {
+  const sh = ss().getSheetByName('cycle');
+  if (!sh) return 'no cycle sheet';
+  const cidCol = HEADERS.cycle.indexOf('client_id') + 1;
+  const last = sh.getLastRow();
+  if (last < 2) return 'no rows';
+  const ids = sh.getRange(2, cidCol, last - 1, 1).getValues();
+  let fixed = 0;
+  for (let i = 0; i < ids.length; i++) {
+    if (String(ids[i][0] || '').indexOf('test-') === 0) {
+      sh.getRange(i + 2, cidCol).setValue('c-' + Utilities.getUuid());
+      fixed++;
+    }
+  }
+  Logger.log('normalized ' + fixed + ' cycle row(s)');
+  return 'normalized ' + fixed;
+}
+
 function photoFolder() {
   const it = DriveApp.getFoldersByName(PHOTO_FOLDER);
   return it.hasNext() ? it.next() : DriveApp.createFolder(PHOTO_FOLDER);

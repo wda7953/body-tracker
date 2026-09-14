@@ -23,3 +23,6 @@ show('get_body_battery', lambda: g.get_body_battery(d, d))
 # 較新功能：訓練準備度、HRV（版本/手錶不支援會顯示錯誤，屬正常）
 show('get_training_readiness', lambda: g.get_training_readiness(d))
 show('get_hrv_data', lambda: g.get_hrv_data(d))
+# Recovery Time 候選來源（Venu 3S 有此功能，但要確認套件從哪個端點吐出來、欄位叫什麼）
+show('get_training_status', lambda: g.get_training_status(d))
+show('get_max_metrics', lambda: g.get_max_metrics(d))
