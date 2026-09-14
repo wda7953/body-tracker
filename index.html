@@ -80,10 +80,16 @@
   <script src="js/api.js"></script>
   <script>
     (async () => {
-      if (!(await API.requireAuth())) return;   // 沒密碼先鎖屏
       const el = document.getElementById('content');
       let res;
-      try { res = await API.apiGet('getAll'); } catch (e) { el.innerHTML = '<div class="card">載入失敗：' + e.message + '</div>'; return; }
+      try {
+        if (!(await API.requireAuth())) return;   // 沒密碼/密碼失效→已鎖屏
+        res = await API.apiGet('getAll');
+      } catch (e) {  // 逾時/斷網：別永遠停在「載入中…」，給錯誤訊息＋重試
+        el.innerHTML = '<div class="card">載入失敗：' + (e.message || e) +
+          '<br><button onclick="location.reload()" style="margin-top:12px;padding:10px 18px;border:0;border-radius:8px;background:#00e676;color:#052e16;font-weight:800">重試</button></div>';
+        return;
+      }
       if (!res.ok) { el.innerHTML = '<div class="card">錯誤：' + res.error + '</div>'; return; }
       const { daily, body, cycle, settings } = res.data;
       // 數字格式化小工具：null/NaN → '—'，否則四捨五入到 d 位（須定義在所有使用點之前，避免 const TDZ）

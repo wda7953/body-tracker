@@ -25,19 +25,35 @@ function isExpired() {
   } catch (e) { return true; }
 }
 
-async function apiGet(action, params = {}) {
+const REQUEST_TIMEOUT_MS = 12000;  // 後端(Apps Script)偶發卡住時的逾時上限，超過就 reject 讓畫面能顯示錯誤+重試
+
+// 帶逾時的 fetch：後端一直不回應時不再永遠 hang（畫面卡在「載入中…」的根因）
+async function fetchWithTimeout(url, opts = {}, ms = REQUEST_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw new Error('連線逾時，請檢查網路後重試');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function apiGet(action, params = {}, timeoutMs) {
   const url = new URL(API_URL);
   url.searchParams.set('action', action);
   url.searchParams.set('token', getToken());
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString());
+  const res = await fetchWithTimeout(url.toString(), {}, timeoutMs);
   return res.json();
 }
-async function apiPost(action, data) {
+async function apiPost(action, data, timeoutMs) {
   const url = new URL(API_URL);
   url.searchParams.set('action', action);
   url.searchParams.set('token', getToken());
-  const res = await fetch(url.toString(), { method: 'POST', body: JSON.stringify(data) });
+  const res = await fetchWithTimeout(url.toString(), { method: 'POST', body: JSON.stringify(data) }, timeoutMs);
   return res.json();
 }
 
@@ -73,7 +89,11 @@ function _lockScreen(message) {
     if (!val) return;
     setToken(val);
     msg.textContent = '驗證中…'; msg.style.color = '#7d8896';
-    const res = await apiGet('getSettings');       // 拿密碼打一個輕量端點驗證
+    let res;
+    try { res = await apiGet('getSettings'); }      // 拿密碼打一個輕量端點驗證
+    catch (e) {  // 逾時/斷網：別卡在「驗證中…」，保留剛輸入的密碼讓他再按解鎖重試
+      msg.style.color = '#ff6b6b'; msg.textContent = e.message || '連線逾時，請重試'; pw.focus(); return;
+    }
     if (res && res.ok) { wrap.remove(); location.reload(); }   // 對了：存起來、重載進 App
     else { clearToken(); msg.style.color = '#ff6b6b'; msg.textContent = '密碼不對，再試一次'; pw.value = ''; pw.focus(); }
   };
@@ -91,4 +111,7 @@ async function requireAuth() {
   clearToken(); _lockScreen('密碼已失效，請重新輸入'); return false;
 }
 
-window.API = { apiGet, apiPost, apiGetPhoto, genClientId, requireAuth, clearToken };
+// Node 測試與瀏覽器各自掛載（比照 calc.js／context.js 的雙環境慣例）
+const apiExports = { apiGet, apiPost, apiGetPhoto, genClientId, requireAuth, clearToken, fetchWithTimeout };
+if (typeof module !== 'undefined') { module.exports = apiExports; }
+if (typeof window !== 'undefined') { window.API = apiExports; }
