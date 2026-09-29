@@ -26,3 +26,20 @@ show('get_hrv_data', lambda: g.get_hrv_data(d))
 # Recovery Time 候選來源（Venu 3S 有此功能，但要確認套件從哪個端點吐出來、欄位叫什麼）
 show('get_training_status', lambda: g.get_training_status(d))
 show('get_max_metrics', lambda: g.get_max_metrics(d))
+
+# 運動紀錄（Recovery Clocks 要自動判訓練類型用）：印最近 7 天每筆運動的關鍵欄位，
+# 確認 Venu 3S 到底回不回 平均/最大心率、有氧/無氧訓練效果、activityType 等（免得又撈到全 None）
+def recent_activities():
+    start = (datetime.date.fromisoformat(d) - datetime.timedelta(days=7)).isoformat()
+    acts = g.get_activities_by_date(start, d) or []
+    keys = ['activityName', 'startTimeLocal', 'distance', 'duration', 'movingDuration',
+            'averageHR', 'maxHR', 'averageSpeed', 'maxSpeed',
+            'aerobicTrainingEffect', 'anaerobicTrainingEffect', 'trainingEffectLabel']
+    slim = []
+    for a in acts:
+        row = {k: a.get(k) for k in keys}
+        at = a.get('activityType') or {}
+        row['activityType'] = at.get('typeKey') if isinstance(at, dict) else at
+        slim.append(row)
+    return {'count': len(slim), 'activities': slim}
+show('get_activities_by_date(近7天)', recent_activities)
