@@ -16,6 +16,7 @@ const HEADERS = {
   daily: ['date','tdee_total','active_kcal','bmr_kcal','steps','resting_hr','sleep_score','sleep_hours','avg_stress','body_battery','training_readiness','hrv_last_night','hrv_status'],
   body:  ['date','weight_kg','waist_cm','photo_front','photo_side','photo_back','note','client_id'],
   cycle: ['date','client_id'],   // 生理期「開始日」（每次來的第一天）；期間長度/週期天數放 settings
+  training: ['date','session','intensity','note','client_id'],  // 訓練紀錄（Recovery Clocks 用）：session=rest/easy/long/threshold/interval/sprint/strength
   settings: ['key','value'],
 };
 
@@ -36,6 +37,7 @@ function doPost(e) {
     if (e.parameter.action === 'addDaily')    return jsonOk(addDaily(data));
     if (e.parameter.action === 'addBody')     return jsonOk(addBody(data));
     if (e.parameter.action === 'addCycle')    return jsonOk(addCycle(data));
+    if (e.parameter.action === 'addTraining') return jsonOk(addTraining(data));
     if (e.parameter.action === 'setSetting')  return jsonOk(setSetting(data));
     return jsonErr('unknown action');
   } catch (err) { return jsonErr(err.message); }
@@ -69,7 +71,7 @@ function readAll(name) {
 }
 
 function getAll() {
-  return { daily: readAll('daily'), body: readAll('body'), cycle: readAll('cycle'), settings: readAll('settings') };
+  return { daily: readAll('daily'), body: readAll('body'), cycle: readAll('cycle'), training: readAll('training'), settings: readAll('settings') };
 }
 
 // daily 依 date upsert（同日覆蓋），避免排程重跑產生重複列
@@ -129,6 +131,22 @@ function addCycle(data) {
         const rd = (r[dateCol] instanceof Date) ? Utilities.formatDate(r[dateCol], tz, 'yyyy-MM-dd') : String(r[dateCol]);
         if (rd === String(data.date)) return { ok: true, deduped: 'same-date' };
       }
+    }
+    sh.appendRow(head.map(h => data[h] != null ? data[h] : ''));
+    return { ok: true, added: data.date };
+  } finally { lock.releaseLock(); }
+}
+
+// training：記錄一筆訓練（Recovery Clocks 用）。以 client_id 去重（重試安全）；允許同一天多筆（不同 session）。
+function addTraining(data) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const sh = getOrCreateSheet('training');
+    const head = HEADERS.training;
+    const cidCol = head.indexOf('client_id');
+    if (data.client_id && sh.getLastRow() >= 2) {
+      const ids = sh.getRange(2, cidCol + 1, sh.getLastRow() - 1, 1).getValues().flat().map(String);
+      if (ids.indexOf(String(data.client_id)) >= 0) return { ok: true, deduped: true };
     }
     sh.appendRow(head.map(h => data[h] != null ? data[h] : ''));
     return { ok: true, added: data.date };

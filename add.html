@@ -30,6 +30,10 @@
     .nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #0b0e12; border-top: 1px solid #1c2430; padding-bottom: env(safe-area-inset-bottom); }
     .nav a { flex: 1; text-align: center; padding: 12px; font-size: 12px; color: #7d8896; text-decoration: none; }
     .nav a.active { color: #00e676; font-weight: 700; }
+    .opt { display: flex; flex-wrap: wrap; gap: 8px; }
+    .opt button { flex: 1 1 auto; min-width: 30%; padding: 10px; background: #0e1116; color: #cbd5e1; border: 1px solid #2b333d; border-radius: 10px; font-size: 14px; font-family: inherit; }
+    .opt button.sel { border-color: #00e676; color: #00e676; background: rgba(0,230,118,.08); font-weight: 700; }
+    .opt.small button { min-width: 0; }
   </style>
 </head>
 <body>
@@ -55,6 +59,34 @@
       <input type="text" id="note">
       <button class="save" id="save">儲存</button>
       <div class="msg" id="msg"></div>
+    </div>
+
+    <!-- 訓練紀錄（Recovery Clocks 用）-->
+    <div class="card">
+      <h2 style="font-size:13px;color:#7d8896;margin:0 0 4px;font-weight:600">訓練紀錄</h2>
+      <p style="font-size:12px;color:#7d8896;margin:0 0 12px;line-height:1.5">記昨天／今天練了什麼，儀表板「恢復就緒度」會依此算 5 個時鐘。忘了記可把日期往回改補登。</p>
+      <label>日期（可往回補登）</label>
+      <input type="date" id="trDate">
+      <label>訓練類型</label>
+      <div class="opt" id="trSession">
+        <button data-s="rest">休息</button>
+        <button data-s="easy">easy 有氧</button>
+        <button data-s="long">長跑</button>
+        <button data-s="threshold">閾值</button>
+        <button data-s="interval">高強度間歇</button>
+        <button data-s="sprint">衝刺/爆發</button>
+        <button data-s="strength">重量訓練</button>
+      </div>
+      <label>強度</label>
+      <div class="opt small" id="trIntensity">
+        <button data-i="light">輕</button>
+        <button data-i="normal" class="sel">中</button>
+        <button data-i="hard">重</button>
+      </div>
+      <label>備註（選填）</label>
+      <input type="text" id="trNote" placeholder="例：10×100m 或 深蹲硬舉">
+      <button class="save" id="trSave">記錄訓練</button>
+      <div class="msg" id="trMsg"></div>
     </div>
 
     <!-- 生理期記錄 -->
@@ -175,6 +207,35 @@
         if (cd) await API.apiPost('setSetting', { key: 'cycle_days', value: parseInt(cd, 10) });
         settingsMsg.textContent = '設定已儲存 ✓'; settingsMsg.style.color = '#2E7D32';
       } catch (err) { settingsMsg.textContent = '網路錯誤：' + err.message; settingsMsg.style.color = '#C62828'; }
+    });
+
+    // ── 訓練紀錄（Recovery Clocks）──
+    document.getElementById('trDate').value = todayStr();   // 預設今天，可往回補登
+    let trSession = null, trIntensity = 'normal';
+    const trMsg = document.getElementById('trMsg');
+    document.querySelectorAll('#trSession button').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('#trSession button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel'); trSession = b.dataset.s;
+    }));
+    document.querySelectorAll('#trIntensity button').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('#trIntensity button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel'); trIntensity = b.dataset.i;
+    }));
+    document.getElementById('trSave').addEventListener('click', async () => {
+      if (!trSession) { trMsg.textContent = '先選訓練類型'; trMsg.style.color = '#C62828'; return; }
+      trMsg.textContent = '記錄中…'; trMsg.style.color = '#777';
+      try {
+        const r = await API.apiPost('addTraining', {
+          date: document.getElementById('trDate').value || todayStr(),
+          session: trSession, intensity: trIntensity,
+          note: document.getElementById('trNote').value, client_id: API.genClientId(),
+        });
+        if (r.ok) {
+          trMsg.style.color = '#2E7D32';
+          trMsg.textContent = r.deduped ? '已記錄過 ✓' : '已記錄 ✓';
+          document.getElementById('trNote').value = '';
+        } else { trMsg.textContent = '失敗：' + r.error + '（後端若未更新會顯示 unknown action）'; trMsg.style.color = '#C62828'; }
+      } catch (err) { trMsg.textContent = '網路錯誤：' + err.message; trMsg.style.color = '#C62828'; }
     });
   </script>
 </body>
