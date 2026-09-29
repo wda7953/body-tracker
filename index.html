@@ -94,7 +94,7 @@
   <script src="js/calc.js"></script>
   <script src="js/context.js"></script>
   <script src="js/advice.js"></script>
-  <script src="js/readiness.js"></script>
+  <script src="js/readiness.js?v=20260929"></script>
   <script src="js/chart.js"></script>
   <script src="js/api.js"></script>
   <script>
@@ -192,18 +192,22 @@
       // ── 恢復就緒度（Recovery Clocks）──
       // Venu 3S 沒有 Garmin 原生 Training Readiness，自律神經層一律用當天 HRV狀態/睡眠/壓力/電量判；
       // 5 個時鐘（Fuel/Muscle/Neuromuscular/Tissue/Coordination）由「最近練了什麼」推算（見 readiness.js）
-      const rc = Readiness.recoveryClocks({ today: todayLocal, training, daily: dailyAsc });
-      const AUTO_ZH = { good: '✅ 良好', ok: '🟡 普通', poor: '🔴 偏差', unknown: '—' };
-      const v = rc.verdict;
-      const avoidLine = (v.avoid && v.avoid.length) ? `<div class="av">今天避免：${v.avoid.join('、')}</div>` : '';
-      const autoSig = rc.autonomic.signals.length ? `（${rc.autonomic.signals.join('、')}）` : '';
-      const clockRows = rc.clocks.map(c => `
+      // 用 try/catch 隔離：就算 readiness.js 沒載到或出錯，也只影響這張卡，不讓整個儀表板卡在載入中。
+      let rcCard = '';
+      try {
+        if (typeof Readiness === 'undefined') throw new Error('readiness.js 未載入（可能是舊快取）');
+        const rc = Readiness.recoveryClocks({ today: todayLocal, training, daily: dailyAsc });
+        const AUTO_ZH = { good: '✅ 良好', ok: '🟡 普通', poor: '🔴 偏差', unknown: '—' };
+        const v = rc.verdict;
+        const avoidLine = (v.avoid && v.avoid.length) ? `<div class="av">今天避免：${v.avoid.join('、')}</div>` : '';
+        const autoSig = rc.autonomic.signals.length ? `（${rc.autonomic.signals.join('、')}）` : '';
+        const clockRows = rc.clocks.map(c => `
           <div class="clk">
             <div class="clk-top"><span>${c.icon} ${c.name}</span><span class="p ${c.status}">${c.stressedBy ? c.readiness + '%' : '—'}</span></div>
             <div class="clk-bar"><div class="clk-fill ${c.status}" style="width:${c.readiness}%"></div></div>
             <div class="clk-by">${c.stressedBy ? `受 ${c.elapsedDays === 0 ? '今天' : c.elapsedDays + ' 天前'}「${c.stressedByZh}」影響` : '無近期負荷'}</div>
           </div>`).join('');
-      const rcCard = `
+        rcCard = `
         <div class="card rc">
           <h2>恢復就緒度 · Recovery Clocks</h2>
           <div class="rc-verdict ${v.level}">${v.title}<div class="d">${v.detail}</div>${avoidLine}</div>
@@ -211,6 +215,9 @@
           ${clockRows}
           <div class="src">Feeling Recovered ≠ System Recovered　·　恢復天數為示意估計，依訓練強度與當日 HRV／睡眠／壓力／電量調整　·　概念取自 JRS「Recovery Clocks」</div>
         </div>`;
+      } catch (e) {
+        rcCard = `<div class="card"><h2>恢復就緒度</h2><div style="font-size:13px;color:#ff9b9b">載入失敗：${e.message}</div></div>`;
+      }
 
       // 體重圖：原始點 + 均線 + 目標線
       // 兩條線都從已依日期排序的 ma 陣列取值（body 分頁可能有補登的舊資料造成順序錯亂，
