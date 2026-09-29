@@ -4,6 +4,7 @@
 import os, sys, json, datetime, getpass, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from garmin_login import make_client
+from garmin_classify import classify_activity
 
 def taipei_yesterday():
     tw = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)
@@ -70,6 +71,13 @@ def main():
     except Exception:
         pass
 
+    # 運動紀錄（Recovery Clocks）：撈當日 activities，稍後自動分類寫進 training 分頁
+    activities = []
+    try:
+        activities = g.get_activities_by_date(date, date) or []
+    except Exception as e:
+        print('撈 activities 失敗（不影響每日數據）：', e, file=sys.stderr)
+
     # Garmin 端已全部撈完，g 內部持有本次刷新後的最新 token → 立刻存回（不等後端 POST）
     persist_token(g)
 
@@ -106,6 +114,28 @@ def main():
     print('verified:', ok)
     if not ok:
         print('backend 未確認寫入', file=sys.stderr); sys.exit(1)
+
+    # 把當日運動自動分類後寫進 training 分頁（Recovery Clocks 用）。
+    # addTraining 以 client_id（activityId）去重 → 每天重跑不會重複；失敗不影響每日數據。
+    tr_posted = 0
+    for a in activities:
+        res = classify_activity(a)
+        if not res:
+            continue
+        session, intensity = res
+        aid = a.get('activityId')
+        adate = str(a.get('startTimeLocal') or date)[:10]
+        payload_t = {
+            'date': adate, 'session': session, 'intensity': intensity,
+            'note': (a.get('activityName') or '') + '（Garmin）',
+            'client_id': 'gm_' + (str(aid) if aid else adate + '_' + session),
+        }
+        try:
+            requests.post(f'{api_url}?action=addTraining&token={token}', json=payload_t, timeout=30)
+            tr_posted += 1
+        except Exception as e:
+            print('training POST 失敗（單筆略過）：', e, file=sys.stderr)
+    print(f'training 自動寫入 {tr_posted}/{len(activities)} 筆')
 
 if __name__ == '__main__':
     main()

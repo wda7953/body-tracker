@@ -23,7 +23,7 @@ const CLOCKS = [
 
 // 訓練類型中文
 const SESSION_ZH = {
-  rest: '休息', easy: 'easy 有氧', long: '長跑', threshold: '閾值',
+  rest: '休息', easy: 'easy 有氧', cardio: '有氧/飛輪', long: '長跑', threshold: '閾值',
   interval: '高強度間歇', sprint: '衝刺/爆發', strength: '重量訓練',
 };
 
@@ -32,6 +32,7 @@ const SESSION_ZH = {
 const SESSION_COST = {
   rest:      {},
   easy:      { fuel: 0.5 },
+  cardio:    { fuel: 1,   muscle: 1 },                                      // 中高強度但低衝擊（飛輪/有氧課）：代謝+些微肌肉，無組織/神經肌肉/協調
   long:      { fuel: 1,   muscle: 1.5, tissue: 2,   coordination: 1.5 },
   threshold: { fuel: 1,   muscle: 1,   neuromuscular: 1 },
   interval:  { fuel: 1,   muscle: 1.5, neuromuscular: 2, tissue: 1.5 },
