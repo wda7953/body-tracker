@@ -38,6 +38,7 @@ function doPost(e) {
     if (e.parameter.action === 'addBody')     return jsonOk(addBody(data));
     if (e.parameter.action === 'addCycle')    return jsonOk(addCycle(data));
     if (e.parameter.action === 'addTraining') return jsonOk(addTraining(data));
+    if (e.parameter.action === 'deleteTraining') return jsonOk(deleteTraining(data));
     if (e.parameter.action === 'setSetting')  return jsonOk(setSetting(data));
     return jsonErr('unknown action');
   } catch (err) { return jsonErr(err.message); }
@@ -150,6 +151,23 @@ function addTraining(data) {
     }
     sh.appendRow(head.map(h => data[h] != null ? data[h] : ''));
     return { ok: true, added: data.date };
+  } finally { lock.releaseLock(); }
+}
+
+// training：依 client_id 刪一列（App 內刪錯記/示範資料用）。找不到也回 ok（冪等）。
+function deleteTraining(data) {
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const sh = ss().getSheetByName('training');
+    if (!sh) return { ok: true, notfound: true };
+    const cidCol = HEADERS.training.indexOf('client_id');
+    const last = sh.getLastRow();
+    if (last < 2) return { ok: true, notfound: true };
+    const ids = sh.getRange(2, cidCol + 1, last - 1, 1).getValues().flat().map(String);
+    const idx = ids.indexOf(String(data.client_id));
+    if (idx < 0) return { ok: true, notfound: true };
+    sh.deleteRow(idx + 2);   // +2：跳過表頭、轉 1-based
+    return { ok: true, deleted: data.client_id };
   } finally { lock.releaseLock(); }
 }
 

@@ -34,6 +34,11 @@
     .opt button { flex: 1 1 auto; min-width: 30%; padding: 10px; background: #0e1116; color: #cbd5e1; border: 1px solid #2b333d; border-radius: 10px; font-size: 14px; font-family: inherit; }
     .opt button.sel { border-color: #00e676; color: #00e676; background: rgba(0,230,118,.08); font-weight: 700; }
     .opt.small button { min-width: 0; }
+    .tr-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid #1b2129; font-size: 13px; }
+    .tr-item:last-child { border-bottom: 0; }
+    .tr-item .info { color: #cbd5e1; line-height: 1.4; }
+    .tr-item .info .d { color: #7d8896; font-size: 11px; margin-top: 2px; }
+    .tr-item .x { flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid #3a2530; background: #241318; color: #ff8f8f; border-radius: 8px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -88,6 +93,11 @@
       <input type="text" id="trNote" placeholder="例：10×100m 或 深蹲硬舉">
       <button class="save" id="trSave">記錄訓練</button>
       <div class="msg" id="trMsg"></div>
+
+      <div id="trListWrap" style="margin-top:16px; border-top:1px solid #232c38; padding-top:12px">
+        <div style="font-size:12px;color:#7d8896;margin-bottom:8px">最近訓練（點 ✕ 刪除）</div>
+        <div id="trList"><div style="font-size:12px;color:#7d8896">載入中…</div></div>
+      </div>
     </div>
 
     <!-- 生理期記錄 -->
@@ -235,9 +245,49 @@
           trMsg.style.color = '#2E7D32';
           trMsg.textContent = r.deduped ? '已記錄過 ✓' : '已記錄 ✓';
           document.getElementById('trNote').value = '';
+          renderTrList();   // 記完刷新清單
         } else { trMsg.textContent = '失敗：' + r.error + '（後端若未更新會顯示 unknown action）'; trMsg.style.color = '#C62828'; }
       } catch (err) { trMsg.textContent = '網路錯誤：' + err.message; trMsg.style.color = '#C62828'; }
     });
+
+    // ── 最近訓練清單 + 刪除 ──
+    const TR_ZH = { rest: '休息', easy: 'easy 有氧', cardio: '有氧/飛輪', long: '長跑', threshold: '閾值', interval: '高強度間歇', sprint: '衝刺/爆發', strength: '重量訓練' };
+    const INT_ZH = { light: '輕', normal: '中', hard: '重' };
+    const trListEl = document.getElementById('trList');
+    async function renderTrList() {
+      try {
+        const res = await API.apiGet('getAll');
+        if (!res || !res.ok) { trListEl.innerHTML = '<div style="font-size:12px;color:#ff9b9b">讀取失敗</div>'; return; }
+        const list = (res.data.training || [])
+          .slice()
+          .sort((a, b) => (String(a.date) < String(b.date) ? 1 : -1))   // 新到舊
+          .slice(0, 12);
+        if (!list.length) { trListEl.innerHTML = '<div style="font-size:12px;color:#7d8896">還沒有訓練紀錄</div>'; return; }
+        trListEl.innerHTML = list.map(t => {
+          const cid = String(t.client_id || '').replace(/"/g, '&quot;');
+          const note = t.note ? ('　' + String(t.note)) : '';
+          return `<div class="tr-item">
+            <div class="info">${TR_ZH[t.session] || t.session}<span style="color:#7d8896">・${INT_ZH[t.intensity] || t.intensity || ''}</span>
+              <div class="d">${String(t.date).slice(0, 10)}${note}</div></div>
+            <button class="x" data-cid="${cid}" title="刪除">✕</button>
+          </div>`;
+        }).join('');
+        trListEl.querySelectorAll('.x').forEach(btn => btn.addEventListener('click', () => delTraining(btn.dataset.cid, btn)));
+      } catch (e) {
+        trListEl.innerHTML = '<div style="font-size:12px;color:#ff9b9b">讀取失敗：' + e.message + '</div>';
+      }
+    }
+    async function delTraining(cid, btn) {
+      if (!cid) return;
+      if (!confirm('刪除這筆訓練紀錄？')) return;
+      btn.disabled = true; btn.textContent = '…';
+      try {
+        const r = await API.apiPost('deleteTraining', { client_id: cid });
+        if (r && r.ok) { renderTrList(); }
+        else { btn.disabled = false; btn.textContent = '✕'; alert('刪除失敗：' + ((r && r.error) || '後端可能未更新')); }
+      } catch (e) { btn.disabled = false; btn.textContent = '✕'; alert('網路錯誤：' + e.message); }
+    }
+    renderTrList();
   </script>
 </body>
 </html>
