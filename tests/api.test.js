@@ -32,3 +32,32 @@ test('apiGet: 後端正常回應時照常回傳 json', async () => {
   const r = await api.apiGet('getSettings');
   assert.deepStrictEqual(r, { ok: true, data: { x: 1 } });
 });
+
+test('apiGet: 暫時性錯誤（Safari「did not match pattern」）自動重試後成功', async () => {
+  let n = 0;
+  global.fetch = async () => {
+    n++;
+    if (n === 1) throw new TypeError('The string did not match the expected pattern.');
+    return { json: async () => ({ ok: true, data: { retried: true } }) };
+  };
+  const r = await api.apiGet('getAll');
+  assert.strictEqual(n, 2, '應重試一次共打 2 次');
+  assert.deepStrictEqual(r, { ok: true, data: { retried: true } });
+});
+
+test('isTransientError: 冷啟動類錯誤算暫時性、逾時不算', () => {
+  assert.strictEqual(api.isTransientError(new TypeError('The string did not match the expected pattern.')), true);
+  assert.strictEqual(api.isTransientError(new Error('Load failed')), true);
+  assert.strictEqual(api.isTransientError(new Error('連線逾時，請檢查網路後重試')), false);
+});
+
+test('fetchWithRetry: 逾時錯誤不重試（避免疊加多個 30s）', async () => {
+  let n = 0;
+  global.fetch = (url, opts) => new Promise((_, reject) => {
+    n++;
+    const sig = opts && opts.signal;
+    if (sig) sig.addEventListener('abort', () => { const e = new Error('Aborted'); e.name = 'AbortError'; reject(e); });
+  });
+  await assert.rejects(api.fetchWithRetry('http://x', {}, 30), /逾時/);
+  assert.strictEqual(n, 1, '逾時只打 1 次、不重試');
+});

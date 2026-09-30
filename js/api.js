@@ -43,19 +43,47 @@ async function fetchWithTimeout(url, opts = {}, ms = REQUEST_TIMEOUT_MS) {
   }
 }
 
+// 「暫時性」錯誤才值得自動重試：GAS 冷啟動 + 302 轉址時，Safari 偶發丟 TypeError /
+// 「The string did not match the expected pattern.」/「Load failed」等——後端其實會醒，
+// 隔一下重打就過。逾時是我們自己丟的（已等滿 REQUEST_TIMEOUT_MS）＝不算暫時性、不重試，
+// 交給呼叫端顯示「重試」UI，避免又疊上好幾個 30s。
+function isTransientError(e) {
+  if (!e) return false;
+  const msg = String((e && e.message) || e);
+  if (msg.includes('連線逾時')) return false;
+  return e.name === 'TypeError'
+    || /did not match the expected pattern|load failed|network|networkerror|connection|fetch/i.test(msg);
+}
+
+// 帶逾時 + 對暫時性錯誤自動重試（退避 0.8s、1.6s）。
+// 本 App 所有寫入都有 client_id / date upsert 去重，POST 重試不會產生重複，安全。
+async function fetchWithRetry(url, opts = {}, ms = REQUEST_TIMEOUT_MS, tries = 3) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fetchWithTimeout(url, opts, ms);
+    } catch (e) {
+      lastErr = e;
+      if (i === tries - 1 || !isTransientError(e)) throw e;
+      await new Promise(r => setTimeout(r, 800 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 async function apiGet(action, params = {}, timeoutMs) {
   const url = new URL(API_URL);
   url.searchParams.set('action', action);
   url.searchParams.set('token', getToken());
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetchWithTimeout(url.toString(), {}, timeoutMs);
+  const res = await fetchWithRetry(url.toString(), {}, timeoutMs);
   return res.json();
 }
 async function apiPost(action, data, timeoutMs) {
   const url = new URL(API_URL);
   url.searchParams.set('action', action);
   url.searchParams.set('token', getToken());
-  const res = await fetchWithTimeout(url.toString(), { method: 'POST', body: JSON.stringify(data) }, timeoutMs);
+  const res = await fetchWithRetry(url.toString(), { method: 'POST', body: JSON.stringify(data) }, timeoutMs);
   return res.json();
 }
 
@@ -114,6 +142,6 @@ async function requireAuth() {
 }
 
 // Node 測試與瀏覽器各自掛載（比照 calc.js／context.js 的雙環境慣例）
-const apiExports = { apiGet, apiPost, apiGetPhoto, genClientId, requireAuth, clearToken, fetchWithTimeout };
+const apiExports = { apiGet, apiPost, apiGetPhoto, genClientId, requireAuth, clearToken, fetchWithTimeout, fetchWithRetry, isTransientError };
 if (typeof module !== 'undefined') { module.exports = apiExports; }
 if (typeof window !== 'undefined') { window.API = apiExports; }
